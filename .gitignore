@@ -1,0 +1,31 @@
+node_modules/
+*.log
+.DS_Store
+
+# Construit par la CI et joint à la release, jamais versionné.
+dist/
+
+# Artefacts de la V1 : maquettes Claude Design et photos de travail. Ils ne
+# servent pas au pack, pèsent plus de sept mégaoctets, et les maquettes
+# embarquent un jeu d'icônes tiers qu'il faudrait redistribuer avec sa notice.
+Main.dc.html
+AmpliGuitare.dc.html
+canvas.json
+ressources-images/
+
+# Notes de travail internes : elles pointent vers des chemins locaux et vers
+# des fichiers absents du dépôt public.
+CLAUDE.md
+SPEC-CARTES.md
+
+# Rendus et pages d'exploration de la phase matières : ils ont servi à choisir
+# l'échelle de grain, aucun n'est référencé par la documentation et ils pèsent
+# à eux seuls plus de cinq mégaoctets.
+docs/carbone-toile.png
+docs/fond-*.png
+docs/reglage-*.png
+dev/carbone-toile.*
+dev/fond*.html
+dev/reglage-*.html
+dev/lumiere.html
+dev/showcase.html

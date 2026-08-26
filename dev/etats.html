@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>States</title>
+<style>
+  html, body { margin: 0; background: #111214; font-family: Roboto, system-ui, sans-serif; }
+  .grid { width: 1040px; box-sizing: border-box; padding: 20px; display: grid; grid-template-columns: 492px 492px; gap: 16px 16px; }
+  .cell { height: 248px; }
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script type="module">
+// La planche illustre la section States du README, donc en anglais comme lui.
+Object.defineProperty(navigator, "language", { value: "en-GB", configurable: true });
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const lightBase = {
+  supported_color_modes: ["color_temp", "hs"],
+  min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500,
+  color_temp_kelvin: 3200, hs_color: [38, 62], rgb_color: [255, 190, 105],
+};
+
+const socle = { last_changed: "", last_updated: "", context: {} };
+
+const states = {
+  "light.on": { entity_id: "light.on", state: "on", ...socle,
+    attributes: { ...lightBase, friendly_name: "Ceiling light", brightness: 178 } },
+  "light.off": { entity_id: "light.off", state: "off", ...socle,
+    attributes: { ...lightBase, friendly_name: "Ceiling light", brightness: 0 } },
+  "media_player.on": { entity_id: "media_player.on", state: "playing", ...socle,
+    attributes: { friendly_name: "Living room", volume_level: 0.62,
+      media_title: "Radio Nostalgie", media_artist: "FM 90.4",
+      supported_features: 1 | 4 | 16 | 32 | 4096 | 16384 } },
+  "media_player.off": { entity_id: "media_player.off", state: "off", ...socle,
+    attributes: { friendly_name: "Living room", volume_level: 0.62,
+      media_title: "Radio Nostalgie",
+      supported_features: 1 | 4 | 16 | 32 | 4096 | 16384 } },
+  "cover.closed": { entity_id: "cover.closed", state: "closed", ...socle,
+    attributes: { friendly_name: "Bedroom blind", current_position: 0, supported_features: 15 } },
+  "sensor.hs": { entity_id: "sensor.hs", state: "unavailable", ...socle,
+    attributes: { friendly_name: "Bathroom humidity", device_class: "humidity", unit_of_measurement: "%" } },
+};
+
+const hass = {
+  states, themes: { darkMode: true }, locale: { language: "en" }, language: "en", connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C" } },
+  localize: (k) => ({
+    "ui.card.light.brightness": "Brightness",
+    "component.media_player.entity_component._.state.playing": "Playing",
+    "component.media_player.entity_component._.state.off": "Off",
+    "component.cover.entity_component._.state.closed": "Closed",
+  })[k] ?? "",
+  formatEntityState: (s) => {
+    const unit = s.attributes.unit_of_measurement;
+    if (unit) return `${s.state}${unit}`;
+    const domain = s.entity_id.split(".")[0];
+    return hass.localize(`component.${domain}.entity_component._.state.${s.state}`) || s.state;
+  },
+  callService: () => Promise.resolve(),
+};
+
+const CARDS = [
+  ["skeuo-light-card", { entity: "light.on", subtitle: "On" }],
+  ["skeuo-light-card", { entity: "light.off", subtitle: "Off, greyscale" }],
+  ["skeuo-media-card", { entity: "media_player.on", subtitle: "Playing" }],
+  ["skeuo-media-card", { entity: "media_player.off", subtitle: "Off, greyscale" }],
+  ["skeuo-cover-card", { entity: "cover.closed", subtitle: "Closed, a normal state" }],
+  ["skeuo-sensor-card", { entity: "sensor.hs", subtitle: "Unavailable, darkened" }],
+];
+
+const grid = document.getElementById("grid");
+for (const [type, config] of CARDS) {
+  const el = document.createElement(type);
+  el.setConfig({ type: `custom:${type}`, ...config });
+  el.hass = hass;
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.appendChild(el);
+  grid.appendChild(cell);
+}
+await Promise.all([...grid.querySelectorAll("*")].map((e) => e.updateComplete ?? true));
+</script>
+</body>
+</html>

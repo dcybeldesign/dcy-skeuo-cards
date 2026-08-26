@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Reprendre le tag comme numéro de version
+        run: |
+          version="${GITHUB_REF#refs/tags/}"
+          version="${version#v}"
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "Le tag « $version » n'est pas un semver" >&2
+            exit 1
+          fi
+          npm version "$version" --no-git-tag-version --allow-same-version
+
+      - run: npm ci
+      - run: npm run build
+
+      # HACS cherche d'abord un asset de release portant le nom déclaré dans
+      # hacs.json ; sans asset, il retomberait sur le zipball du dépôt.
+      - name: Joindre le bundle à la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/skeuo-cards.js

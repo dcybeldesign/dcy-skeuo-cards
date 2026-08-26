@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>English registration check</title></head>
+<body><pre id="out" style="font:13px/1.5 monospace; color:#ddd; background:#141416; padding:20px; margin:0"></pre>
+<script type="module">
+// La langue doit être forcée avant l'import : le sélecteur se peuple au
+// chargement du module, la lecture de navigator.language a lieu à ce moment-là.
+Object.defineProperty(navigator, "language", { value: "en-GB", configurable: true });
+Object.defineProperty(navigator, "languages", { value: ["en-GB", "en"], configurable: true });
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const lignes = [`navigator.language = ${navigator.language}`, "", "Card picker:"];
+for (const c of window.customCards) lignes.push(`  ${c.name}  |  ${c.description}`);
+
+const cls = customElements.get("skeuo-cover-card");
+const f = cls.getConfigForm();
+let erreur = "";
+try { f.assertConfig({ entity: "light.x" }); } catch (e) { erreur = e.message; }
+const trouve = (sc) => { for (const x of sc) { if (x.schema) { const r = trouve(x.schema); if (r) return r; } else if (x.name === "material") return x; } };
+lignes.push("", "Config error: " + erreur);
+lignes.push("Material menu: " + trouve(f.schema).selector.select.options.map(o => o.label).join(", "));
+lignes.push("Editor labels: " + ["entity","name","subtitle","material","accent","screws","texture","refresh","days"].map(n => f.computeLabel({name:n}) ?? "-").join(", "));
+
+// Message générique du mauvais domaine, levé par une instance.
+const el = document.createElement("skeuo-cover-card");
+try { el.setConfig({ type: "custom:skeuo-cover-card", entity: "light.salon" }); } catch (e) { lignes.push("Wrong domain: " + e.message); }
+
+document.getElementById("out").textContent = lignes.join("\n");
+</script></body></html>

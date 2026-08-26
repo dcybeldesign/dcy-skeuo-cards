@@ -1,0 +1,4 @@
+# Fins de ligne normalisées : le dépôt est travaillé sous Windows et compilé
+# par une CI Linux, sans ça chaque aller-retour produirait un diff complet.
+* text=auto eol=lf
+*.png binary

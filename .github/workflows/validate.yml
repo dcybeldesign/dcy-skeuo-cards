@@ -1,0 +1,44 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Un dépôt HACS peut cesser d'être conforme sans qu'on y touche, quand HACS
+    # lui-même change ses règles. Le passage quotidien le signale à temps.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validation HACS
+        uses: hacs/action@main
+        with:
+          category: plugin
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Le bundle doit rester un fichier unique
+        run: |
+          count=$(find dist -maxdepth 1 -name '*.js' | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "dist/ contient $count fichiers .js, HACS n'en sert qu'un" >&2
+            find dist -maxdepth 1 -name '*.js' >&2
+            exit 1
+          fi

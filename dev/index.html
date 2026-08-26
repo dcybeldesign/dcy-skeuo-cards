@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc d'essai · Skeuo Cards</title>
+<style>
+  body {
+    margin: 0; padding: 24px; background: #1c1c1e;
+    font-family: Roboto, system-ui, sans-serif; color: #ddd;
+  }
+  h1 { font-size: 16px; font-weight: 500; margin: 0 0 4px; }
+  p.hint { font-size: 13px; color: #8a8a8a; margin: 0 0 20px; }
+  /* Reproduit la géométrie d'une vue Sections : 12 colonnes, lignes de 56px,
+     gouttière de 8px, largeur de section plafonnée comme dans le frontend. */
+  .section {
+    width: 492px;
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .cell { display: block; min-width: 0; }
+  .rail { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .col-title { font-size: 13px; color: #9a9a9a; margin: 0 0 8px; }
+  .wide { width: 900px; }
+</style>
+</head>
+<body>
+
+<h1>Banc d'essai Skeuo Cards</h1>
+<p class="hint">
+  Deux largeurs de section pour vérifier que la mise à l'échelle tient, et un
+  panneau d'états simulés pour piloter les cartes sans Home Assistant.
+</p>
+
+<div class="rail">
+  <div>
+    <p class="col-title">Section standard (492 px)</p>
+    <div class="section" id="s1"></div>
+  </div>
+  <div>
+    <p class="col-title">Section large (900 px)</p>
+    <div class="section wide" id="s2"></div>
+  </div>
+</div>
+
+<script type="module">
+// Anti-cache : le bundle est reconstruit en continu pendant la mise au point.
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+/* ------------------------------------------------------------ états simulés */
+
+const states = {
+  "light.salon": {
+    entity_id: "light.salon", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Salon · Plafonnier",
+      supported_color_modes: ["color_temp", "hs"],
+      color_mode: "color_temp",
+      brightness: 178,
+      color_temp_kelvin: 3200,
+      min_color_temp_kelvin: 2000,
+      max_color_temp_kelvin: 6500,
+      hs_color: [38, 62],
+    },
+  },
+  "climate.chambre": {
+    entity_id: "climate.chambre", state: "heat",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Chambre · Thermostat",
+      hvac_modes: ["off", "heat", "cool", "fan_only", "auto"],
+      hvac_action: "heating",
+      current_temperature: 19.4,
+      temperature: 21,
+      min_temp: 7, max_temp: 35, target_temp_step: 0.5,
+    },
+  },
+  "cover.salon": {
+    entity_id: "cover.salon", state: "open",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Salon · Volet roulant",
+      current_position: 65,
+      supported_features: 1 | 2 | 4 | 8,
+      device_class: "shutter",
+    },
+  },
+  "sensor.humidite": {
+    entity_id: "sensor.humidite", state: "58",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Salle de bain · Humidité",
+      unit_of_measurement: "%",
+      device_class: "humidity",
+    },
+  },
+  "switch.prise": {
+    entity_id: "switch.prise", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Cuisine · Prise connectée" },
+  },
+  "sensor.prise_puissance": {
+    entity_id: "sensor.prise_puissance", state: "42.3",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Prise · Puissance", unit_of_measurement: "W", device_class: "power" },
+  },
+  "sensor.prise_energie": {
+    entity_id: "sensor.prise_energie", state: "0.62",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Prise · Énergie", unit_of_measurement: "kWh", device_class: "energy" },
+  },
+  "lock.entree": {
+    entity_id: "lock.entree", state: "locked",
+    last_changed: "2026-08-26T14:32:00+02:00", last_updated: "", context: {},
+    attributes: { friendly_name: "Porte d'entrée", supported_features: 1 },
+  },
+  "fan.bureau": {
+    entity_id: "fan.bureau", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Bureau · Ventilateur",
+      percentage: 55, percentage_step: 1,
+      oscillating: false, direction: "forward",
+      supported_features: 1 | 2 | 4,
+    },
+  },
+  "water_heater.ballon": {
+    entity_id: "water_heater.ballon", state: "eco",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Garage · Chauffe-eau",
+      operation_list: ["eco", "performance", "off"],
+      temperature: 55, current_temperature: 52,
+      min_temp: 30, max_temp: 65, target_temp_step: 1,
+    },
+  },
+  "vacuum.robot": {
+    entity_id: "vacuum.robot", state: "docked",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Salon · Aspirateur robot",
+      battery_level: 82,
+      supported_features: 4 | 16 | 64 | 8192,
+    },
+  },
+  "alarm_control_panel.maison": {
+    entity_id: "alarm_control_panel.maison", state: "armed_away",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Maison · Alarme", supported_features: 1 | 2 | 4 },
+  },
+  "sun.sun": {
+    entity_id: "sun.sun", state: "below_horizon",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Soleil",
+      next_rising: new Date(Date.now() + 8 * 3600e3).toISOString(),
+      next_setting: new Date(Date.now() + 22 * 3600e3).toISOString(),
+    },
+  },
+  // Prévisions horaires : chaque élément a une heure, donc un jour ou une nuit.
+  "weather.horaire": {
+    entity_id: "weather.horaire", state: "partlycloudy",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Extérieur horaire",
+      temperature: 15, temperature_unit: "°C",
+      supported_features: 2,
+    },
+  },
+  "weather.exterieur": {
+    entity_id: "weather.exterieur", state: "partlycloudy",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Extérieur",
+      temperature: 18, temperature_unit: "°C",
+      humidity: 62, wind_speed: 11,
+      supported_features: 1,
+    },
+  },
+  // Intégration ancienne : pas d'abonnement, prévisions dans l'attribut.
+  "weather.ancienne": {
+    entity_id: "weather.ancienne", state: "rainy",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Station ancienne",
+      temperature: 12, temperature_unit: "°C",
+      supported_features: 0,
+      forecast: [
+        { datetime: "2026-08-26T00:00:00+02:00", condition: "rainy", temperature: 16, templow: 11 },
+        { datetime: "2026-08-27T00:00:00+02:00", condition: "cloudy", temperature: 18, templow: 12 },
+        { datetime: "2026-08-28T00:00:00+02:00", condition: "sunny", temperature: 24, templow: 14 },
+      ],
+    },
+  },
+  "media_player.salon": {
+    entity_id: "media_player.salon", state: "playing",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Salon · Multimédia",
+      volume_level: 0.62,
+      media_title: "Radio Nostalgie",
+      media_artist: "France · FM 90.4",
+      entity_picture: "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27300%27%20height%3D%27300%27%3E%3Cdefs%3E%3CradialGradient%20id%3D%27g%27%20cx%3D%2735%25%27%20cy%3D%2730%25%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%23e8b25c%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%237a2f1e%27%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27300%27%20height%3D%27300%27%20fill%3D%27url%28%23g%29%27%2F%3E%3Ccircle%20cx%3D%27150%27%20cy%3D%27150%27%20r%3D%2796%27%20fill%3D%27none%27%20stroke%3D%27%231a0f08%27%20stroke-width%3D%2714%27%20opacity%3D%27.55%27%2F%3E%3Ccircle%20cx%3D%27150%27%20cy%3D%27150%27%20r%3D%2754%27%20fill%3D%27%231a0f08%27%20opacity%3D%27.7%27%2F%3E%3C%2Fsvg%3E",
+      supported_features: 1 | 4 | 16 | 32 | 4096 | 16384,
+    },
+  },
+  // Sans pochette ni réglage de volume : le cas d'une enceinte sommaire.
+  "media_player.cuisine": {
+    entity_id: "media_player.cuisine", state: "paused",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Cuisine · Enceinte",
+      media_title: "Podcast du matin",
+      supported_features: 1 | 16384,
+    },
+  },
+  "camera.entree": {
+    entity_id: "camera.entree", state: "idle",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Entrée · Caméra",
+      entity_picture: "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27640%27%20height%3D%27360%27%3E%3Cdefs%3E%3ClinearGradient%20id%3D%27s%27%20x1%3D%270%27%20y1%3D%270%27%20x2%3D%270%27%20y2%3D%271%27%3E%3Cstop%20offset%3D%270%27%20stop-color%3D%27%232b3038%27%2F%3E%3Cstop%20offset%3D%271%27%20stop-color%3D%27%230e1013%27%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%27640%27%20height%3D%27360%27%20fill%3D%27url%28%23s%29%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%27250%27%20width%3D%27640%27%20height%3D%27110%27%20fill%3D%27%2315181c%27%2F%3E%3Crect%20x%3D%2770%27%20y%3D%2790%27%20width%3D%27150%27%20height%3D%27230%27%20fill%3D%27%231b1f24%27%2F%3E%3Crect%20x%3D%27108%27%20y%3D%27140%27%20width%3D%2774%27%20height%3D%27120%27%20fill%3D%27%233a4048%27%2F%3E%3Ccircle%20cx%3D%27300%27%20cy%3D%2760%27%20r%3D%2726%27%20fill%3D%27%23c9b98a%27%20opacity%3D%27.35%27%2F%3E%3Crect%20x%3D%27380%27%20y%3D%27190%27%20width%3D%27190%27%20height%3D%27130%27%20fill%3D%27%23191d21%27%2F%3E%3Crect%20x%3D%270%27%20y%3D%270%27%20width%3D%27640%27%20height%3D%27360%27%20fill%3D%27none%27%20stroke%3D%27%23000%27%20stroke-width%3D%272%27%2F%3E%3C%2Fsvg%3E",
+      motion_detection: true,
+      supported_features: 2,
+    },
+  },
+  // Cas limites volontaires
+  "light.couloir": {
+    entity_id: "light.couloir", state: "off",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Couloir", supported_color_modes: ["onoff"] },
+  },
+  "sensor.hs": {
+    entity_id: "sensor.hs", state: "unavailable",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Capteur hors service", device_class: "temperature" },
+  },
+};
+
+const hass = {
+  states,
+  themes: { darkMode: true, theme: "default" },
+  locale: { language: "fr", number_format: "comma_decimal", time_format: "24" },
+  language: "fr",
+  connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C", length: "km", mass: "kg" } },
+  localize: (key) => {
+    const map = {
+      "ui.card.light.brightness": "Luminosité",
+      "ui.card.cover.open_cover": "Ouvrir",
+      "ui.card.cover.close_cover": "Fermer",
+      "ui.card.cover.stop_cover": "Arrêter",
+      "ui.card.common.turn_on": "Allumer",
+      "ui.card.media_player.media_play": "Lecture",
+      "ui.card.media_player.media_pause": "Pause",
+      "ui.card.media_player.media_stop": "Arrêter",
+      "ui.card.media_player.media_next_track": "Piste suivante",
+      "ui.card.media_player.media_previous_track": "Piste précédente",
+      "component.media_player.entity_component._.state.playing": "En lecture",
+      "component.media_player.entity_component._.state.paused": "En pause",
+      "component.camera.entity_component._.state.idle": "En veille",
+      "component.weather.entity_component._.state.partlycloudy": "Partiellement nuageux",
+      "component.weather.entity_component._.state.rainy": "Pluie",
+      "component.weather.entity_component._.state.sunny": "Ensoleillé",
+      "ui.card.lock.lock": "Verrouiller",
+      "ui.card.lock.unlock": "Déverrouiller",
+      "ui.card.lock.open": "Ouvrir le loquet",
+      "ui.card.vacuum.start": "Démarrer",
+      "ui.card.vacuum.pause": "Suspendre",
+      "ui.card.vacuum.return_to_base": "Retour à la base",
+      "ui.card.alarm_control_panel.arm_home": "Armer en présence",
+      "ui.card.alarm_control_panel.arm_away": "Armer en absence",
+      "ui.card.alarm_control_panel.arm_night": "Armer la nuit",
+      "ui.card.alarm_control_panel.disarm": "Désarmer",
+      "component.lock.entity_component._.state.locked": "Verrouillé",
+      "component.lock.entity_component._.state.unlocked": "Déverrouillé",
+      "component.vacuum.entity_component._.state.docked": "À la base",
+      "component.vacuum.entity_component._.state.cleaning": "Nettoyage",
+      "component.alarm_control_panel.entity_component._.state.armed_away": "Armé absent",
+      "component.alarm_control_panel.entity_component._.state.disarmed": "Désarmé",
+      "component.climate.entity_component._.state.heat": "Chauffage",
+      "component.climate.entity_component._.state.cool": "Climatisation",
+      "component.climate.entity_component._.state_attributes.hvac_action.state.heating": "Chauffe",
+    };
+    return map[key] ?? "";
+  },
+  // Le vrai frontend traduit l'état avant de l'afficher ; un simulacre qui
+  // renverrait l'état brut ferait passer pour correct un rendu qui montrerait
+  // « armed_away » à l'utilisateur.
+  // Reproduit weather/subscribe_forecast : le premier message part avant que
+  // la promesse d'abonnement ne soit tenue, comme sur une vraie connexion.
+  connection: {
+    subscribeMessage: (cb, msg) => {
+      if (msg?.type !== "weather/subscribe_forecast") return Promise.resolve(async () => {});
+      window.__abos = (window.__abos ?? 0) + 1;
+      const jours = [
+        ["2026-08-26", "partlycloudy", 21, 12],
+        ["2026-08-27", "rainy", 19, 11],
+        ["2026-08-28", "cloudy", 17, 10],
+        ["2026-08-29", "sunny", 24, 13],
+        ["2026-08-30", "lightning-rainy", 20, 14],
+        ["2026-08-31", "snowy", 4, -2],
+        ["2026-09-01", "fog", 12, 8],
+      ];
+      const quotidien = jours.map(([d, condition, temperature, templow]) => ({
+        datetime: `${d}T00:00:00+02:00`, condition, temperature, templow,
+      }));
+      // Sept heures à partir de maintenant, sur un soleil couché : les
+      // premières tombent de nuit, les dernières après le lever.
+      // Toutes en partlycloudy et espacées de trois heures : la série traverse
+      // le lever du soleil, ce qui rend la bascule jour-nuit observable.
+      const horaire = jours.map((_, i) => ({
+        datetime: new Date(Date.now() + (i + 1) * 3 * 3600e3).toISOString(),
+        condition: "partlycloudy", temperature: 13 + i,
+      }));
+      const forecast = msg.forecast_type === "hourly" ? horaire : quotidien;
+      queueMicrotask(() => cb({ type: "event", forecast }));
+      return new Promise((res) =>
+        setTimeout(() => res(async () => { window.__desabos = (window.__desabos ?? 0) + 1; }), 30)
+      );
+    },
+  },
+  formatEntityState: (s) => {
+    const unit = s.attributes.unit_of_measurement;
+    if (unit) return `${s.state}${unit}`;
+    const domain = s.entity_id.split(".")[0];
+    const key = `component.${domain}.entity_component._.state.${s.state}`;
+    return hass.localize(key) || s.state;
+  },
+  callService: (domain, service, data) => {
+    console.log("callService", domain, service, data);
+    // Boucle de retour simplifiée pour voir la carte réagir au clic.
+    const id = data?.entity_id;
+    const prev = id && states[id];
+    if (!prev) return Promise.resolve();
+
+    // Home Assistant remplace l'objet d'état à chaque changement, il ne le mute
+    // jamais. Le reproduire ici est indispensable : le filtre shouldUpdate des
+    // cartes compare des références, une mutation en place passerait inaperçue.
+    const next = { ...prev, attributes: { ...prev.attributes } };
+    if (service === "toggle") next.state = prev.state === "on" ? "off" : "on";
+    if (service === "turn_off") next.state = "off";
+    if (service === "turn_on") {
+      next.state = "on";
+      if (data.brightness_pct !== undefined) next.attributes.brightness = Math.round(data.brightness_pct * 2.55);
+      // Home Assistant bascule color_mode dès qu'on lui envoie l'un ou l'autre :
+      // une lampe est soit sur une température de blanc, soit sur une couleur.
+      // On retire rgb_color au passage, ce qui force la carte à recalculer la
+      // teinte émise depuis le réglage actif.
+      if (data.color_temp_kelvin !== undefined) {
+        next.attributes.color_temp_kelvin = data.color_temp_kelvin;
+        next.attributes.color_mode = "color_temp";
+        delete next.attributes.rgb_color;
+      }
+      if (data.hs_color !== undefined) {
+        next.attributes.hs_color = data.hs_color;
+        next.attributes.color_mode = "hs";
+        delete next.attributes.rgb_color;
+      }
+    }
+    if (service === "set_cover_position") next.attributes.current_position = data.position;
+    if (service === "open_cover") { next.state = "open"; next.attributes.current_position = 100; }
+    if (service === "close_cover") { next.state = "closed"; next.attributes.current_position = 0; }
+    if (service === "set_temperature") next.attributes.temperature = data.temperature;
+    if (service === "set_percentage") next.attributes.percentage = data.percentage;
+    if (service === "volume_set") next.attributes.volume_level = data.volume_level;
+    if (service === "media_play_pause") next.state = next.state === "playing" ? "paused" : "playing";
+    if (service === "media_stop") next.state = "idle";
+    if (service === "enable_motion_detection") next.attributes.motion_detection = true;
+    if (service === "disable_motion_detection") next.attributes.motion_detection = false;
+    if (service === "oscillate") next.attributes.oscillating = data.oscillating;
+    if (service === "set_direction") next.attributes.direction = data.direction;
+    if (service === "set_operation_mode") next.state = data.operation_mode;
+    if (service === "lock") next.state = "locked";
+    if (service === "unlock") next.state = "unlocked";
+    if (service === "start") next.state = "cleaning";
+    if (service === "pause") next.state = "paused";
+    if (service === "return_to_base") next.state = "returning";
+    if (service === "alarm_arm_home") next.state = "armed_home";
+    if (service === "alarm_arm_away") next.state = "armed_away";
+    if (service === "alarm_arm_night") next.state = "armed_night";
+    if (service === "alarm_disarm") next.state = "disarmed";
+    if (service === "set_hvac_mode") next.state = data.hvac_mode;
+    states[id] = next;
+    push();
+    return Promise.resolve();
+  },
+};
+
+/* ------------------------------------------------------ montage des cartes */
+
+const CARDS = [
+  { type: "skeuo-light-card", config: { entity: "light.salon", subtitle: "Plafonnier · Dimmer" } },
+  { type: "skeuo-climate-card", config: { entity: "climate.chambre", subtitle: "Thermostat" } },
+  { type: "skeuo-cover-card", config: { entity: "cover.salon", subtitle: "Store motorisé" } },
+  { type: "skeuo-sensor-card", config: { entity: "sensor.humidite", subtitle: "Capteur" } },
+  { type: "skeuo-switch-card", config: { entity: "switch.prise", subtitle: "Prise pilotée",
+      power_entity: "sensor.prise_puissance", energy_entity: "sensor.prise_energie" } },
+  { type: "skeuo-lock-card", config: { entity: "lock.entree", subtitle: "Verrouillage connecté" } },
+  { type: "skeuo-fan-card", config: { entity: "fan.bureau", subtitle: "Circulation d'air" } },
+  { type: "skeuo-water-heater-card", config: { entity: "water_heater.ballon", subtitle: "Ballon thermodynamique" } },
+  { type: "skeuo-vacuum-card", config: { entity: "vacuum.robot", subtitle: "Robot nettoyeur" } },
+  { type: "skeuo-alarm-card", config: { entity: "alarm_control_panel.maison", subtitle: "Système de sécurité" } },
+  { type: "skeuo-weather-card", config: { entity: "weather.exterieur", subtitle: "Prévisions locales" } },
+  { type: "skeuo-forecast-card", config: { entity: "weather.exterieur", subtitle: "Prévisions 5 jours" } },
+  { type: "skeuo-forecast-card", config: { entity: "weather.ancienne", subtitle: "Attribut historique" } },
+  { type: "skeuo-weather-card", config: { entity: "weather.horaire", subtitle: "Nuit en cours" } },
+  { type: "skeuo-forecast-card", config: { entity: "weather.horaire", subtitle: "Prévisions horaires", days: 7 } },
+  { type: "skeuo-media-card", config: { entity: "media_player.salon", subtitle: "MPD · Bluetooth" } },
+  { type: "skeuo-media-card", config: { entity: "media_player.cuisine", subtitle: "Enceinte sommaire" } },
+  { type: "skeuo-camera-card", config: { entity: "camera.entree", subtitle: "Vidéosurveillance" } },
+  { type: "skeuo-light-card", config: { entity: "light.couloir", subtitle: "Sans variateur" } },
+  { type: "skeuo-sensor-card", config: { entity: "sensor.hs", subtitle: "Cas indisponible" } },
+  { type: "skeuo-cover-card", config: { entity: "cover.inexistant", subtitle: "Entité absente" } },
+];
+
+const mounted = [];
+
+function mount(hostId, sectionWidth) {
+  const host = document.getElementById(hostId);
+  for (const { type, config } of CARDS) {
+    const el = document.createElement(type);
+    try {
+      el.setConfig({ type: `custom:${type}`, ...config });
+    } catch (err) {
+      const box = document.createElement("div");
+      box.style.cssText = "grid-column: span 12; color:#ff8a6b; font-size:13px";
+      box.textContent = `${type} → setConfig a levé : ${err.message}`;
+      host.appendChild(box);
+      continue;
+    }
+    const opts = el.getGridOptions ? el.getGridOptions() : { columns: 12, rows: 4 };
+    const cols = opts.columns === "full" ? 12 : (opts.columns ?? 12);
+    const rows = opts.rows ?? 4;
+
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.style.gridColumn = `span ${cols}`;
+    cell.style.height = `${rows * 56 + (rows - 1) * 8}px`;
+    cell.appendChild(el);
+    host.appendChild(cell);
+    mounted.push(el);
+  }
+  console.log(`[${hostId}] section ${sectionWidth}px, ${CARDS.length} cartes montées`);
+}
+
+function push() {
+  // On remplace l'objet pour reproduire l'immuabilité de HA : c'est ce qui
+  // permet au filtre shouldUpdate de fonctionner comme en production.
+  const next = { ...hass, states: { ...states } };
+  for (const el of mounted) el.hass = next;
+}
+
+mount("s1", 492);
+mount("s2", 900);
+push();
+
+window.__cards = mounted;
+window.__push = push;
+window.__states = states;
+console.log("Cartes déclarées au picker :", window.customCards);
+</script>
+</body>
+</html>

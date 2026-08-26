@@ -1,0 +1,31 @@
+{
+  "name": "skeuo-cards",
+  "version": "1.0.0",
+  "description": "Skeuomorphic Lovelace cards for Home Assistant",
+  "type": "module",
+  "license": "MIT",
+  "author": "dcybeldesign",
+  "repository": { "type": "git", "url": "https://github.com/dcybeldesign/dcy-skeuo-cards" },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "watch": "vite build --watch",
+    "serve": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lit": "^3.3.2"
+  },
+  "devDependencies": {
+    "browserslist": "^4.24.0",
+    "browserslist-to-esbuild": "^2.1.1",
+    "terser": "^5.36.0",
+    "typescript": "^5.9.0",
+    "vite": "^6.0.0"
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "not dead",
+    "not op_mini all"
+  ]
+}

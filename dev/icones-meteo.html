@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Icônes météo</title>
+<style>
+  body { margin:0; padding:24px; background:#141416; font-family:Roboto, system-ui, sans-serif; color:#d6d6d6; }
+  h1 { font-size:16px; font-weight:500; margin:0 0 4px; }
+  p.hint { font-size:13px; color:#7f7f83; margin:0 0 20px; }
+  h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:#7f7f83;
+       margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid #262629; }
+  .grille { display:flex; flex-wrap:wrap; gap:14px; }
+  figure { margin:0; display:flex; flex-direction:column; align-items:center; gap:7px; }
+  figcaption { font-size:11px; color:#8c8c90; }
+  /* Même vitre que les cartes, pour juger la lueur sur son vrai fond. */
+  .vitre { display:flex; align-items:center; justify-content:center; border-radius:12px;
+           background: radial-gradient(ellipse at 50% 30%, #241a10, #140d07 75%);
+           box-shadow: inset 4px 4px 3px rgba(0,0,0,.9), 0 0 0 3px #100b06; }
+</style>
+</head>
+<body>
+<h1>Les quinze conditions du domaine weather</h1>
+<p class="hint">Grande taille comme sur la carte météo, petite taille comme dans une colonne de prévision.</p>
+<h2>105 px, avec halo</h2>
+<div class="grille" id="grand"></div>
+<h2>54 px, sans halo</h2>
+<div class="grille" id="petit"></div>
+<script type="module">
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+const CONDITIONS = ["clear-night","cloudy","exceptional","fog","hail","lightning","lightning-rainy",
+  "partlycloudy","partlycloudy-night","pouring","rainy","snowy","snowy-rainy","sunny","windy","windy-variant","inconnue"];
+for (const [hostId, size, glow, box] of [["grand",105,true,150],["petit",54,false,84]]) {
+  for (const c of CONDITIONS) {
+    const fig = document.createElement("figure");
+    const cap = document.createElement("figcaption");
+    cap.textContent = c;
+    const vitre = document.createElement("div");
+    vitre.className = "vitre";
+    vitre.style.width = box + "px";
+    vitre.style.height = box + "px";
+    const ic = document.createElement("skeuo-weather-icon");
+    ic.condition = c; ic.size = size; ic.glow = glow;
+    vitre.appendChild(ic);
+    fig.appendChild(vitre); fig.appendChild(cap);
+    document.getElementById(hostId).appendChild(fig);
+  }
+}
+</script>
+</body>
+</html>
