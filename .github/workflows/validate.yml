@@ -34,6 +34,13 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Le bundle commité doit correspondre aux sources
+        run: |
+          if ! git diff --exit-code --stat dist/; then
+            echo "dist/ est en retard sur src/ : relancer npm run build et commiter" >&2
+            exit 1
+          fi
+
       - name: Le bundle doit rester un fichier unique
         run: |
           count=$(find dist -maxdepth 1 -name '*.js' | wc -l)

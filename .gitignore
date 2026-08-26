@@ -2,8 +2,11 @@ node_modules/
 *.log
 .DS_Store
 
-# Construit par la CI et joint à la release, jamais versionné.
-dist/
+# dist/ est versionné, contrairement à l'usage. HACS valide la structure du
+# dépôt sur la branche par défaut et y cherche le fichier compilé : sans lui,
+# la validation échoue avec « repository structure is not compliant », même si
+# la release porte bien l'asset. La CI vérifie en retour que le fichier commité
+# correspond bien à une compilation fraîche des sources.
 
 # Artefacts de la V1 : maquettes Claude Design et photos de travail. Ils ne
 # servent pas au pack, pèsent plus de sept mégaoctets, et les maquettes
