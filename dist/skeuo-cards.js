@@ -7222,7 +7222,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc3"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.2"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );
