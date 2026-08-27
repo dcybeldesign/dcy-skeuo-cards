@@ -12,6 +12,7 @@ import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/ba
 import { type HassEntity, computeEntityName, isUnavailable, numericState } from "../core/ha";
 import { domainRequired, formatState, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
+import { formatFixed } from "../core/format";
 import { SmoothValue } from "../core/smooth";
 import { iconOscillate, iconPower, iconRotate } from "../components/icons";
 
@@ -139,7 +140,9 @@ export class SkeuoFanCard extends SkeuoBaseCard {
         : nothing}
 
       <skeuo-screen
-        .value=${settable ? `${speed}%` : formatState(this.hass, stateObj)}
+        .value=${settable
+          ? formatFixed(this.hass, speed, 0, "%")
+          : formatState(this.hass, stateObj)}
         .label=${settable ? t(this.hass, "speed") : computeEntityName(stateObj)}
         .valueSize=${settable ? 44.1 : 30}
         .color=${dead || !on ? "#6b5a44" : this.accent}

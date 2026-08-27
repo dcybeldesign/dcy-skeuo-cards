@@ -3,7 +3,7 @@ import { customElement } from "lit/decorators.js";
 
 import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/base-card";
 import { type HassEntity, computeEntityName, isUnavailable, numericState } from "../core/ha";
-import { fitValueSize } from "../core/format";
+import { fitValueSize, formatFixed } from "../core/format";
 import { domainRequired, formatState, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 import { iconDock, iconPause, iconPlay } from "../components/icons";
@@ -88,7 +88,10 @@ export class SkeuoVacuumCard extends SkeuoBaseCard {
     const battery = this._supports(stateObj, SUPPORT_BATTERY)
       ? numericState(stateObj.attributes.battery_level)
       : undefined;
-    const text = battery !== undefined ? `${Math.round(battery)}%` : formatState(this.hass, stateObj);
+    const text =
+      battery !== undefined
+        ? formatFixed(this.hass, Math.round(battery), 0, "%")
+        : formatState(this.hass, stateObj);
 
     return html`
       <div class="slot">

@@ -52,9 +52,19 @@ const hass = {
     "component.media_player.entity_component._.state.off": "Off",
     "component.cover.entity_component._.state.closed": "Closed",
   })[k] ?? "",
+  // Same contract as the frontend: entity display precision, the language
+  // decimal separator, and a non-breaking space before the unit.
   formatEntityState: (s) => {
     const unit = s.attributes.unit_of_measurement;
-    if (unit) return `${s.state}${unit}`;
+    const raw = Number(s.state);
+    if (unit && Number.isFinite(raw)) {
+      const p = s.attributes.suggested_display_precision;
+      const options = p === undefined
+        ? { maximumFractionDigits: 2 }
+        : { minimumFractionDigits: p, maximumFractionDigits: p };
+      return `${new Intl.NumberFormat("en-GB", options).format(raw)} ${unit}`;
+    }
+    if (unit) return `${s.state} ${unit}`;
     const domain = s.entity_id.split(".")[0];
     return hass.localize(`component.${domain}.entity_component._.state.${s.state}`) || s.state;
   },

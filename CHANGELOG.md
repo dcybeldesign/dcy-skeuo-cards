@@ -19,12 +19,18 @@
   repeated presses accumulate. Three taps on plus used to compute the same
   single step three times while the thermostat had yet to answer, so the
   setpoint only advanced by one.
+- The brightness knob no longer bottoms out at zero. It stops at 1 %, so
+  turning it all the way down dims the light instead of switching it off.
+  Switching off is what the toggle on the card is for, and a dimmer that cuts
+  out at the end of its travel makes you lose the setting you had just found.
 - Numeric readings follow the display precision Home Assistant holds for each
   entity, set by hand in its options or proposed by the integration, along
   with the decimal separator and the space before the unit. A sensor reporting
   58.333333 showed exactly that; it now reads 58 % like everywhere else in the
-  dashboard. Compact forms keep their glued degree sign: the thermostat dial
-  and the forecast strip.
+  dashboard. The percentages a card computes itself, brightness, blind
+  position, fan speed and vacuum battery, take the same spacing, which is also
+  what the frontend does with them. Compact forms keep their glued degree
+  sign: the thermostat dial and the forecast strip.
 
 ## 1.0.1
 - Fixed the card height in Masonry views. Size was declared through

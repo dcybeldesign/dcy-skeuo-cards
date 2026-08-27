@@ -1703,6 +1703,50 @@ const baseSchema = () => [
     ]
   }
 ];
+const NBSP = " ";
+const entityPrecision = (hass, stateObj) => {
+  const set = hass?.entities?.[stateObj.entity_id]?.display_precision;
+  if (typeof set === "number") return set;
+  const suggested = stateObj.attributes.suggested_display_precision;
+  return typeof suggested === "number" ? suggested : void 0;
+};
+const localNumber = (hass, value, precision) => {
+  const language = hass?.locale?.language ?? hass?.language;
+  const options = precision === void 0 ? { maximumFractionDigits: 2 } : { minimumFractionDigits: precision, maximumFractionDigits: precision };
+  try {
+    return new Intl.NumberFormat(language, options).format(value);
+  } catch {
+    return precision === void 0 ? String(value) : value.toFixed(precision);
+  }
+};
+const formatAttribute = (hass, stateObj, attribute, unit) => {
+  const done = hass?.formatEntityAttributeValue?.(stateObj, attribute);
+  if (done) return done;
+  const value = Number(stateObj.attributes[attribute]);
+  if (!Number.isFinite(value)) return "";
+  return withUnit(localNumber(hass, value, entityPrecision(hass, stateObj)), unit);
+};
+const formatFixed = (hass, value, decimals, unit) => withUnit(localNumber(hass, value, decimals), unit);
+const withUnit = (text, unit) => unit ? `${text}${NBSP}${unit}` : text;
+const VALUE_SIZE = 44.1;
+const fitValueSize = (text) => {
+  const length = text.length;
+  if (length <= 5) return VALUE_SIZE;
+  if (length <= 7) return 36;
+  if (length <= 9) return 29;
+  if (length <= 12) return 24;
+  return 19;
+};
+const trimNumber = (value) => {
+  const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+  return String(rounded);
+};
+const shortTime = (iso, language) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
+};
 const TICK = "__skeuoSmoothTick";
 const easeInOutCubic = (t2) => t2 < 0.5 ? 4 * t2 * t2 * t2 : 1 - Math.pow(-2 * t2 + 2, 3) / 2;
 const prefersReducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2730,6 +2774,7 @@ const hsToRgb = (hue, saturation) => {
   const seg = h2 < 60 ? [c2, x2, 0] : h2 < 120 ? [x2, c2, 0] : h2 < 180 ? [0, c2, x2] : h2 < 240 ? [0, x2, c2] : h2 < 300 ? [x2, 0, c2] : [c2, 0, x2];
   return [clamp255((seg[0] + m2) * 255), clamp255((seg[1] + m2) * 255), clamp255((seg[2] + m2) * 255)];
 };
+const MIN_BRIGHTNESS = 1;
 let SkeuoLightCard = class extends SkeuoBaseCard {
   constructor() {
     super(...arguments);
@@ -2877,14 +2922,16 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
    * La molette est déjà sous le doigt à sa nouvelle position : on y cale la
    * valeur lissée sans animer, sinon elle reviendrait en arrière au
    * relâchement pour re-parcourir le trajet que l'utilisateur venait de faire.
+   *
+   * Elle ne descend jamais sous MIN_BRIGHTNESS : éteindre est le rôle de
+   * l'interrupteur, pas celui du variateur. Sur un vrai panneau on ne coupe pas
+   * une lampe en tournant le bouton à fond, et surtout un variateur qui éteint
+   * en butée oblige à rallumer par un autre geste pour retrouver sa lumière.
    */
   _setBrightness(pct) {
-    this._brightness.commit(pct);
-    if (pct <= 0) {
-      this.callService("light", "turn_off");
-      return;
-    }
-    this.callService("light", "turn_on", { brightness_pct: pct });
+    const cible = Math.max(MIN_BRIGHTNESS, pct);
+    this._brightness.commit(cible);
+    this.callService("light", "turn_on", { brightness_pct: cible });
   }
   _setWarmth(warmth) {
     this.callService("light", "turn_on", { color_temp_kelvin: this._kelvinFromWarmth(warmth) });
@@ -2908,6 +2955,7 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
       ${dimmable ? b`
             <skeuo-knob
               .value=${brightness}
+              .min=${MIN_BRIGHTNESS}
               .size=${170}
               .disabled=${off}
               .label=${tHa(this.hass, "ui.card.light.brightness", "brightness")}
@@ -2936,7 +2984,7 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
           ` : A}
 
       <skeuo-screen
-        .value=${dimmable ? `${Math.round(brightness)}%` : on ? t(this.hass, "on") : t(this.hass, "off")}
+        .value=${dimmable ? formatFixed(this.hass, Math.round(brightness), 0, "%") : on ? t(this.hass, "on") : t(this.hass, "off")}
         .label=${dimmable ? tHa(this.hass, "ui.card.light.brightness", "brightness") : stateObj.attributes.friendly_name ?? ""}
         .color=${on ? this.accent : "#6b5a44"}
       ></skeuo-screen>
@@ -2972,50 +3020,6 @@ registerCard({
   },
   preview: true
 });
-const NBSP = " ";
-const entityPrecision = (hass, stateObj) => {
-  const set = hass?.entities?.[stateObj.entity_id]?.display_precision;
-  if (typeof set === "number") return set;
-  const suggested = stateObj.attributes.suggested_display_precision;
-  return typeof suggested === "number" ? suggested : void 0;
-};
-const localNumber = (hass, value, precision) => {
-  const language = hass?.locale?.language ?? hass?.language;
-  const options = precision === void 0 ? { maximumFractionDigits: 2 } : { minimumFractionDigits: precision, maximumFractionDigits: precision };
-  try {
-    return new Intl.NumberFormat(language, options).format(value);
-  } catch {
-    return precision === void 0 ? String(value) : value.toFixed(precision);
-  }
-};
-const formatAttribute = (hass, stateObj, attribute, unit) => {
-  const done = hass?.formatEntityAttributeValue?.(stateObj, attribute);
-  if (done) return done;
-  const value = Number(stateObj.attributes[attribute]);
-  if (!Number.isFinite(value)) return "";
-  return withUnit(localNumber(hass, value, entityPrecision(hass, stateObj)), unit);
-};
-const formatFixed = (hass, value, decimals, unit) => withUnit(localNumber(hass, value, decimals), unit);
-const withUnit = (text, unit) => unit ? `${text}${NBSP}${unit}` : text;
-const VALUE_SIZE = 44.1;
-const fitValueSize = (text) => {
-  const length = text.length;
-  if (length <= 5) return VALUE_SIZE;
-  if (length <= 7) return 36;
-  if (length <= 9) return 29;
-  if (length <= 12) return 24;
-  return 19;
-};
-const trimNumber = (value) => {
-  const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
-  return String(rounded);
-};
-const shortTime = (iso, language) => {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
-};
 const box = (inner, size = 16) => w`<svg width=${size} height=${size} viewBox="0 0 16 16">${inner}</svg>`;
 const iconPower = () => box(w`
     <path fill="none" stroke="currentColor" d="M11.44 4.08 A6 6 0 1 1 4.56 4.08" stroke-width="1.6" stroke-linecap="round"/>
@@ -3835,7 +3839,7 @@ let SkeuoCoverCard = class extends SkeuoBaseCard {
           ` : A}
 
       <skeuo-screen
-        .value=${positionable ? `${Math.round(shown)}%` : formatState(this.hass, stateObj)}
+        .value=${positionable ? formatFixed(this.hass, Math.round(shown), 0, "%") : formatState(this.hass, stateObj)}
         .label=${positionable ? t(this.hass, "opening") : formatState(this.hass, stateObj)}
         .valueSize=${positionable ? 44.1 : 30}
         .color=${moving ? "#9db8c9" : this.accent}
@@ -4624,7 +4628,7 @@ let SkeuoFanCard = class extends SkeuoBaseCard {
           ` : A}
 
       <skeuo-screen
-        .value=${settable ? `${speed}%` : formatState(this.hass, stateObj)}
+        .value=${settable ? formatFixed(this.hass, speed, 0, "%") : formatState(this.hass, stateObj)}
         .label=${settable ? t(this.hass, "speed") : computeEntityName(stateObj)}
         .valueSize=${settable ? 44.1 : 30}
         .color=${dead || !on ? "#6b5a44" : this.accent}
@@ -4912,7 +4916,7 @@ let SkeuoVacuumCard = class extends SkeuoBaseCard {
     const busy = BUSY_STATES.includes(stateObj.state);
     const error = stateObj.state === "error";
     const battery = this._supports(stateObj, SUPPORT_BATTERY) ? numericState(stateObj.attributes.battery_level) : void 0;
-    const text = battery !== void 0 ? `${Math.round(battery)}%` : formatState(this.hass, stateObj);
+    const text = battery !== void 0 ? formatFixed(this.hass, Math.round(battery), 0, "%") : formatState(this.hass, stateObj);
     return b`
       <div class="slot">
         <skeuo-button
@@ -7156,7 +7160,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc1"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc2"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );

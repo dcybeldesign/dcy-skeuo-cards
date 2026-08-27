@@ -12,6 +12,7 @@ import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/ba
 import { type HassEntity, isActive, isUnavailable, numericState } from "../core/ha";
 import { domainRequired, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
+import { formatFixed } from "../core/format";
 import { SmoothValue } from "../core/smooth";
 
 import "../components/screen";
@@ -71,6 +72,13 @@ const hsToRgb = (hue: number, saturation: number): [number, number, number] => {
     : [c, 0, x];
   return [clamp255((seg[0] + m) * 255), clamp255((seg[1] + m) * 255), clamp255((seg[2] + m) * 255)];
 };
+
+/**
+ * Plancher du variateur, en pourcentage. La molette ne peut pas éteindre :
+ * c'est le rôle de l'interrupteur de la carte, et un variateur qui coupe en
+ * butée fait perdre le réglage qu'on venait de trouver.
+ */
+const MIN_BRIGHTNESS = 1;
 
 @customElement("skeuo-light-card")
 export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
@@ -256,14 +264,16 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
    * La molette est déjà sous le doigt à sa nouvelle position : on y cale la
    * valeur lissée sans animer, sinon elle reviendrait en arrière au
    * relâchement pour re-parcourir le trajet que l'utilisateur venait de faire.
+   *
+   * Elle ne descend jamais sous MIN_BRIGHTNESS : éteindre est le rôle de
+   * l'interrupteur, pas celui du variateur. Sur un vrai panneau on ne coupe pas
+   * une lampe en tournant le bouton à fond, et surtout un variateur qui éteint
+   * en butée oblige à rallumer par un autre geste pour retrouver sa lumière.
    */
   private _setBrightness(pct: number): void {
-    this._brightness.commit(pct);
-    if (pct <= 0) {
-      this.callService("light", "turn_off");
-      return;
-    }
-    this.callService("light", "turn_on", { brightness_pct: pct });
+    const cible = Math.max(MIN_BRIGHTNESS, pct);
+    this._brightness.commit(cible);
+    this.callService("light", "turn_on", { brightness_pct: cible });
   }
 
   private _setWarmth(warmth: number): void {
@@ -297,6 +307,7 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
         ? html`
             <skeuo-knob
               .value=${brightness}
+              .min=${MIN_BRIGHTNESS}
               .size=${170}
               .disabled=${off}
               .label=${tHa(this.hass, "ui.card.light.brightness", "brightness")}
@@ -330,7 +341,11 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
         : nothing}
 
       <skeuo-screen
-        .value=${dimmable ? `${Math.round(brightness)}%` : on ? t(this.hass, "on") : t(this.hass, "off")}
+        .value=${dimmable
+          ? formatFixed(this.hass, Math.round(brightness), 0, "%")
+          : on
+            ? t(this.hass, "on")
+            : t(this.hass, "off")}
         .label=${dimmable
           ? tHa(this.hass, "ui.card.light.brightness", "brightness")
           : (stateObj.attributes.friendly_name ?? "")}

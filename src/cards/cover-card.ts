@@ -5,6 +5,7 @@ import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/ba
 import { type HassEntity, isUnavailable, numericState } from "../core/ha";
 import { domainRequired, formatState, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
+import { formatFixed } from "../core/format";
 import { SmoothValue } from "../core/smooth";
 import { iconDown, iconStop, iconUp } from "../components/icons";
 
@@ -112,7 +113,9 @@ export class SkeuoCoverCard extends SkeuoBaseCard {
         : nothing}
 
       <skeuo-screen
-        .value=${positionable ? `${Math.round(shown)}%` : formatState(this.hass, stateObj)}
+        .value=${positionable
+          ? formatFixed(this.hass, Math.round(shown), 0, "%")
+          : formatState(this.hass, stateObj)}
         .label=${positionable ? t(this.hass, "opening") : formatState(this.hass, stateObj)}
         .valueSize=${positionable ? 44.1 : 30}
         .color=${moving ? "#9db8c9" : this.accent}

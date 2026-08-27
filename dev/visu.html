@@ -327,12 +327,37 @@ const hass = {
       );
     },
   },
+  // Le frontend applique la précision d'affichage de l'entité, le séparateur
+  // décimal de la langue et une espace insécable avant l'unité. Un simulacre
+  // qui collerait l'unité ferait valider au banc autre chose que ce que
+  // l'utilisateur voit, comme ce fut le cas jusqu'en 1.0.1.
   formatEntityState: (s) => {
     const unit = s.attributes.unit_of_measurement;
-    if (unit) return `${s.state}${unit}`;
+    const brut = Number(s.state);
+    if (unit && Number.isFinite(brut)) {
+      const p = s.attributes.suggested_display_precision;
+      const options = p === undefined
+        ? { maximumFractionDigits: 2 }
+        : { minimumFractionDigits: p, maximumFractionDigits: p };
+      return `${new Intl.NumberFormat("fr", options).format(brut)} ${unit}`;
+    }
+    if (unit) return `${s.state} ${unit}`;
     const domain = s.entity_id.split(".")[0];
     const key = `component.${domain}.entity_component._.state.${s.state}`;
     return hass.localize(key) || s.state;
+  },
+  formatEntityAttributeValue: (s, attribut) => {
+    const valeur = Number(s.attributes[attribut]);
+    if (!Number.isFinite(valeur)) return String(s.attributes[attribut] ?? "");
+    const unit = attribut.includes("temp")
+      ? (hass.config.unit_system.temperature ?? "°C")
+      : (s.attributes.unit_of_measurement ?? "");
+    const p = s.attributes.suggested_display_precision;
+    const options = p === undefined
+      ? { maximumFractionDigits: 1 }
+      : { minimumFractionDigits: p, maximumFractionDigits: p };
+    const nombre = new Intl.NumberFormat("fr", options).format(valeur);
+    return unit ? `${nombre} ${unit}` : nombre;
   },
   callService: (domain, service, data) => {
     console.log("callService", domain, service, data);
