@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Share image</title>
+<style>
+  /* Aperçu de partage GitHub : 1280x640. Le cadrage est parfois rogné sur les
+     bords selon la plateforme, le texte reste donc loin des marges. */
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: #0d0e10;
+    /* Lueur en haut-gauche, comme la source de lumière de tout le pack. */
+    background-image:
+      radial-gradient(1100px 700px at 12% -10%, rgba(226, 166, 89, 0.10), transparent 60%),
+      radial-gradient(900px 600px at 110% 120%, rgba(255, 255, 255, 0.04), transparent 65%);
+    font-family: "Oswald", "Roboto Condensed", "Arial Narrow", Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 46px;
+    padding: 0 58px;
+    box-sizing: border-box;
+  }
+
+  .texte { width: 600px; flex: none; }
+
+  .titre {
+    margin: 0;
+    font-size: 82px;
+    line-height: 0.98;
+    font-weight: 600;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: #ece8df;
+    text-shadow: -2px -2px 2px rgba(0, 0, 0, 0.8);
+  }
+
+  .filet {
+    width: 96px;
+    height: 3px;
+    margin: 26px 0 24px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #e2a659, rgba(226, 166, 89, 0));
+  }
+
+  .accroche {
+    margin: 0;
+    font-size: 27px;
+    line-height: 1.35;
+    letter-spacing: 0.6px;
+    color: #b6b3ac;
+  }
+
+  .meta {
+    margin: 30px 0 0;
+    font-size: 19px;
+    letter-spacing: 3.4px;
+    text-transform: uppercase;
+    color: #7e8184;
+  }
+  .meta b { color: #e2a659; font-weight: 600; }
+
+  /* Les cartes sont rendues à leur taille de dessin puis réduites d'un bloc,
+     comme dans le pack : jamais de redimensionnement élément par élément. */
+  .cartes { display: flex; flex-direction: column; gap: 20px; }
+  /* Le cadre occupe la place de la carte réduite, la carte est dessinée à sa
+     taille nominale puis mise à l'échelle depuis le coin haut-gauche. Sans ça
+     la mise en page compte 615 px de large et le bord droit se fait rogner. */
+  .cadre { width: 492px; height: 248px; flex: none; }
+  .cadre > * { display: block; width: 615px; height: 310px; transform: scale(0.8); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+  <div class="texte">
+    <h1 class="titre">Skeuo<br>Cards</h1>
+    <div class="filet"></div>
+    <p class="accroche">Skeuomorphic Lovelace cards for Home Assistant.<br>Carbon fibre, graphite or brushed metal fascia,<br>machined knobs, amber LCD.</p>
+    <p class="meta">14 cards · <b>HACS</b> · MIT</p>
+  </div>
+
+  <div class="cartes">
+    <div class="cadre"><skeuo-light-card id="c1"></skeuo-light-card></div>
+    <div class="cadre"><skeuo-climate-card id="c2"></skeuo-climate-card></div>
+  </div>
+
+<script type="module">
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const socle = { last_changed: "", last_updated: "", context: {} };
+const states = {
+  "light.salon": { entity_id: "light.salon", state: "on", ...socle, attributes: {
+    friendly_name: "Living room", brightness: 178, supported_color_modes: ["color_temp", "hs"],
+    color_mode: "color_temp", min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500,
+    color_temp_kelvin: 3200, hs_color: [38, 62], rgb_color: [255, 190, 105] } },
+  "climate.chambre": { entity_id: "climate.chambre", state: "heat", ...socle, attributes: {
+    friendly_name: "Bedroom", temperature: 21, current_temperature: 19,
+    hvac_action: "heating", target_temp_step: 0.5, min_temp: 7, max_temp: 35,
+    hvac_modes: ["heat", "cool", "fan_only", "auto", "off"] } },
+};
+
+const hass = {
+  states, themes: { darkMode: true }, locale: { language: "en" }, language: "en", connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C" } },
+  localize: (k) => ({
+    "ui.card.light.brightness": "Brightness",
+    "component.climate.entity_component._.state_attributes.hvac_action.state.heating": "Heating",
+  })[k] ?? "",
+  formatEntityState: (s) => {
+    const unit = s.attributes.unit_of_measurement;
+    const brut = Number(s.state);
+    if (unit && Number.isFinite(brut)) {
+      const p = s.attributes.suggested_display_precision;
+      const options = p === undefined
+        ? { maximumFractionDigits: 2 }
+        : { minimumFractionDigits: p, maximumFractionDigits: p };
+      return `${new Intl.NumberFormat("en-GB", options).format(brut)} ${unit}`;
+    }
+    return s.state;
+  },
+  formatEntityAttributeValue: (s, a) => String(s.attributes[a] ?? ""),
+  callService: () => Promise.resolve(),
+};
+
+const poser = (id, type, config) => {
+  const el = document.getElementById(id);
+  el.setConfig({ type: `custom:${type}`, ...config });
+  el.hass = hass;
+  return el.updateComplete;
+};
+
+await poser("c1", "skeuo-light-card", { entity: "light.salon", name: "Living room", subtitle: "Ceiling · dimmer" });
+await poser("c2", "skeuo-climate-card", { entity: "climate.chambre", name: "Bedroom", subtitle: "Thermostat" });
+</script>
+</body>
+</html>
