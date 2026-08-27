@@ -66,6 +66,17 @@ interface SmoothOptions {
   duration?: (delta: number) => number;
 }
 
+/**
+ * Au-delà, on considère que la commande s'est perdue et on reprend ce que dit
+ * l'entité. Assez long pour couvrir un appareil Zigbee lent ou une passerelle
+ * qui groupe ses rapports, assez court pour qu'un contrôle resté faux se
+ * corrige de lui-même sans que l'utilisateur ait à recharger la page.
+ */
+const PENDING_TIMEOUT = 6000;
+
+const now = (): number =>
+  typeof performance !== "undefined" ? performance.now() : Date.now();
+
 export class SmoothValue implements ReactiveController {
   private _host: SmoothHost;
   private _opts: {
@@ -84,6 +95,12 @@ export class SmoothValue implements ReactiveController {
   private _frame?: number;
   private _initialised = false;
   private _seq = 0;
+
+  /** Dernière valeur venue de l'entité, avant toute consigne locale. */
+  private _lastFromState?: number;
+  /** Valeur que l'entité annonçait quand l'utilisateur a posé sa consigne. */
+  private _pendingFrom?: number;
+  private _pendingSince = 0;
 
   constructor(host: SmoothHost, options: SmoothOptions = {}) {
     this._host = host;
@@ -108,6 +125,15 @@ export class SmoothValue implements ReactiveController {
   }
 
   /**
+   * Valeur visée, animation comprise. C'est elle qu'il faut prendre pour base
+   * quand l'utilisateur enchaîne les appuis : repartir de l'entité ferait
+   * calculer trois fois le même pas tant qu'elle n'a pas répondu.
+   */
+  public get goal(): number {
+    return this._target;
+  }
+
+  /**
    * Vise une nouvelle valeur.
    *
    * `immediate` sert quand le changement vient du geste de l'utilisateur
@@ -116,6 +142,20 @@ export class SmoothValue implements ReactiveController {
    */
   public set(target: number, immediate = false): void {
     if (!Number.isFinite(target)) return;
+
+    // Une consigne posée par l'utilisateur met un moment à revenir confirmée
+    // par l'appareil. Entre les deux, l'entité continue d'annoncer son ancienne
+    // valeur, et la recaler dessus ferait repartir le contrôle en arrière avant
+    // qu'il ne refasse le trajet. On ignore donc cet écho périmé, jusqu'à ce
+    // que l'entité bouge pour de bon ou que l'attente devienne déraisonnable.
+    if (!immediate) {
+      this._lastFromState = target;
+      if (this._pendingFrom !== undefined) {
+        const attente = now() - this._pendingSince;
+        if (target === this._pendingFrom && attente < PENDING_TIMEOUT) return;
+        this._pendingFrom = undefined;
+      }
+    }
 
     // Première valeur connue : on se place dessus sans animer, sinon toute
     // carte partirait de zéro à l'affichage.
@@ -156,6 +196,21 @@ export class SmoothValue implements ReactiveController {
     if (this._frame === undefined) this._frame = requestAnimationFrame(this._tick);
   }
 
+  /**
+   * Consigne posée par l'utilisateur. Le contrôle s'y place tout de suite et y
+   * reste, au lieu de retomber sur ce que l'entité continue d'annoncer le temps
+   * que l'appareil réponde. Ce que l'on retient n'est pas la valeur demandée
+   * mais celle que l'entité affichait à cet instant : dès qu'elle en change,
+   * quelle qu'elle soit, on lui rend la main. Un appareil qui borne la demande
+   * ou qui refuse la commande reprend donc la main sans cas particulier.
+   */
+  public commit(target: number): void {
+    if (!Number.isFinite(target)) return;
+    this._pendingFrom = this._lastFromState;
+    this._pendingSince = now();
+    this.set(target, true);
+  }
+
   private _tick = (now: number): void => {
     const elapsed = now - this._startedAt;
     const t = this._duration === 0 ? 1 : Math.min(1, elapsed / this._duration);
@@ -188,5 +243,8 @@ export class SmoothValue implements ReactiveController {
     // Une carte est détruite et recréée à chaque passage en mode édition ;
     // sans ça, la boucle continuerait sur un élément détaché.
     this._cancel();
+    // Une consigne en attente ne survit pas au démontage : au remontage, ce que
+    // dit l'entité fait autorité.
+    this._pendingFrom = undefined;
   }
 }

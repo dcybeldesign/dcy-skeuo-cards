@@ -131,7 +131,7 @@ export class SkeuoMediaCard extends SkeuoBaseCard {
   /* ------------------------------------------------------------- actions */
 
   private _onVolume(ev: CustomEvent): void {
-    this._volume.set(ev.detail.value, true);
+    this._volume.commit(ev.detail.value);
     this.callService("media_player", "volume_set", { volume_level: ev.detail.value / 100 });
   }
 

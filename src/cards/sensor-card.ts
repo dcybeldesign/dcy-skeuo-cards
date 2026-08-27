@@ -3,6 +3,7 @@ import { customElement } from "lit/decorators.js";
 
 import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/base-card";
 import { type HassEntity, computeEntityName, isUnavailable, numericState } from "../core/ha";
+import { fitValueSize } from "../core/format";
 import { formatState } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 
@@ -100,6 +101,12 @@ export class SkeuoSensorCard extends SkeuoBaseCard<SensorCardConfig> {
     const unit = (stateObj.attributes.unit_of_measurement as string | undefined) ?? "";
     const name = computeEntityName(stateObj);
 
+    // Le relevé passe par Home Assistant, qui applique la précision d'affichage
+    // de l'entité et le séparateur décimal de l'utilisateur. Sans ça un capteur
+    // qui remonte 58.333333 s'affiche tel quel, là où le reste du tableau
+    // montre 58 %.
+    const releve = dead || value === undefined ? "—" : formatState(this.hass, stateObj);
+
     return html`
       <skeuo-vu-meter
         .value=${value ?? min}
@@ -112,24 +119,12 @@ export class SkeuoSensorCard extends SkeuoBaseCard<SensorCardConfig> {
       ></skeuo-vu-meter>
 
       <skeuo-screen
-        .value=${dead || value === undefined ? "—" : `${value}${unit}`}
+        .value=${releve}
         .label=${name}
-        .valueSize=${this._valueSize(value, unit)}
+        .valueSize=${fitValueSize(releve)}
         .color=${dead ? "#6b5a44" : this.accent}
       ></skeuo-screen>
     `;
-  }
-
-  /**
-   * On réduit la taille plutôt que de laisser un long relevé déborder du
-   * cadre : la règle du projet interdit toute troncature de texte.
-   */
-  private _valueSize(value: number | undefined, unit: string): number {
-    const length = `${value ?? "—"}${unit}`.length;
-    if (length <= 5) return 44.1;
-    if (length <= 7) return 36;
-    if (length <= 9) return 29;
-    return 24;
   }
 
   static override styles: CSSResultGroup = [

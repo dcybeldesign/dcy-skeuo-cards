@@ -9,9 +9,9 @@ export type HFaderGradient = "level" | "position" | "warmth";
  * Fader horizontal à rail creusé et curseur ivoire.
  *
  * Même mécanique que le fader vertical, sans la rotation : le curseur y est
- * simplement plus haut que large, et le trait gravé sur son capuchon court en
- * travers au lieu de courir le long. La bande sémantique passe donc en dégradé
- * vers la droite, valeur forte en fin de course.
+ * simplement plus haut que large, et le trait gravé sur son capuchon reste
+ * perpendiculaire à la course, donc vertical. La bande sémantique passe en
+ * dégradé vers la droite, valeur forte en fin de course.
  */
 @customElement("skeuo-hfader")
 export class SkeuoHFader extends LitElement {
@@ -165,9 +165,12 @@ export class SkeuoHFader extends LitElement {
         inset 2px 2px 4px rgba(0, 0, 0, 0.9),
         inset -1px -1px 1px rgba(255, 255, 255, 0.1);
     }
-    /* Le capuchon est plus haut que large, et son trait gravé court en travers
-       de la course : c'est ce qui distingue à l'oeil un fader horizontal d'un
-       fader vertical couché. */
+    /* Le capuchon est plus haut que large, et son trait gravé est perpendiculaire
+       à la course, donc vertical ici. C'est la règle sur une vraie table : le
+       trait sert d'index de position en face de la graduation, il coupe le
+       déplacement au lieu de le suivre. Le fader vertical du pack obtient le
+       même résultat avec un dégradé écrit vers la droite, parce que son curseur
+       est tourné de 90 degrés et que son repère local devient horizontal. */
     input[type="range"].fader::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 30px;
@@ -177,7 +180,7 @@ export class SkeuoHFader extends LitElement {
       margin-top: -10px;
       border: 1px solid #c4bc9f;
       background:
-        linear-gradient(to bottom, transparent 46%, #111 46%, #111 54%, transparent 54%),
+        linear-gradient(to right, transparent 46%, #111 46%, #111 54%, transparent 54%),
         linear-gradient(to right, #fdfbf7 0%, #e8e3d2 10%, #f5f0e1 50%, #dcd6c0 90%, #b8b096 100%);
       box-shadow:
         -4px 4px 8px rgba(0, 0, 0, 0.6),
@@ -204,7 +207,7 @@ export class SkeuoHFader extends LitElement {
       cursor: ew-resize;
       border: 1px solid #c4bc9f;
       background:
-        linear-gradient(to bottom, transparent 46%, #111 46%, #111 54%, transparent 54%),
+        linear-gradient(to right, transparent 46%, #111 46%, #111 54%, transparent 54%),
         linear-gradient(to right, #fdfbf7 0%, #e8e3d2 10%, #f5f0e1 50%, #dcd6c0 90%, #b8b096 100%);
       box-shadow:
         -4px 4px 8px rgba(0, 0, 0, 0.6),

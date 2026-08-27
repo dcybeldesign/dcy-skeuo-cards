@@ -9,7 +9,7 @@ import {
   isUnavailable,
   numericState,
 } from "../core/ha";
-import { fitValueSize, trimNumber } from "../core/format";
+import { fitValueSize } from "../core/format";
 import { formatState, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 
@@ -87,10 +87,10 @@ export class SkeuoSwitchCard extends SkeuoBaseCard<SwitchCardConfig> {
     if (!entityId || !this.hass) return undefined;
     const stateObj = this.hass.states[entityId];
     if (!stateObj || isUnavailable(stateObj)) return undefined;
-    const value = numericState(stateObj.state);
-    if (value === undefined) return undefined;
-    const unit = (stateObj.attributes.unit_of_measurement as string | undefined) ?? "";
-    return `${trimNumber(value)}${unit}`;
+    if (numericState(stateObj.state) === undefined) return undefined;
+    // Capteur à part entière : Home Assistant sait déjà à quelle précision il
+    // s'affiche, inutile de deviner à sa place.
+    return formatState(this.hass, stateObj);
   }
 
   private _onToggle(stateObj: HassEntity): void {

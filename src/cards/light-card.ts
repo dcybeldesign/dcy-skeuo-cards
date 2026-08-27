@@ -258,7 +258,7 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
    * relâchement pour re-parcourir le trajet que l'utilisateur venait de faire.
    */
   private _setBrightness(pct: number): void {
-    this._brightness.set(pct, true);
+    this._brightness.commit(pct);
     if (pct <= 0) {
       this.callService("light", "turn_off");
       return;

@@ -97,7 +97,7 @@ export class SkeuoFanCard extends SkeuoBaseCard {
   /* ------------------------------------------------------------- actions */
 
   private _onFaderChange(ev: CustomEvent): void {
-    this._speed.set(ev.detail.value, true);
+    this._speed.commit(ev.detail.value);
     this.callService("fan", "set_percentage", { percentage: ev.detail.value });
   }
 

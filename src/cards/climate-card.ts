@@ -12,6 +12,7 @@ import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/ba
 import { type HassEntity, isUnavailable, numericState } from "../core/ha";
 import { domainRequired, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
+import { formatFixed } from "../core/format";
 import { SmoothValue } from "../core/smooth";
 import {
   iconAuto,
@@ -138,7 +139,7 @@ export class SkeuoClimateCard extends SkeuoBaseCard<ClimateCardConfig> {
   private _formatSetpoint(): string {
     const step = this._step(this.stateObj!);
     const decimals = step < 1 ? 1 : 0;
-    return this._setpoint.value.toFixed(decimals);
+    return formatFixed(this.hass, this._setpoint.value, decimals, this._unit);
   }
 
   private _actionColor(stateObj: HassEntity): string {
@@ -161,12 +162,20 @@ export class SkeuoClimateCard extends SkeuoBaseCard<ClimateCardConfig> {
     }
   }
 
+  /**
+   * Le pas s'applique à la valeur affichée, pas à celle de l'entité. Sans ça,
+   * trois appuis rapides sur le plus calculent trois fois le même degré tant
+   * que le thermostat n'a pas confirmé le premier, et la consigne n'avance que
+   * d'un cran. La consigne est posée localement dans la foulée, pour que
+   * l'écran et le cadran bougent à l'appui et non à la réponse.
+   */
   private _nudge(stateObj: HassEntity, direction: 1 | -1): void {
-    const current = this._target(stateObj);
-    if (current === undefined) return;
+    if (this._target(stateObj) === undefined) return;
     const min = numericState(stateObj.attributes.min_temp) ?? 7;
     const max = numericState(stateObj.attributes.max_temp) ?? 35;
-    const next = Math.min(max, Math.max(min, current + direction * this._step(stateObj)));
+    const base = this._setpoint.goal;
+    const next = Math.min(max, Math.max(min, base + direction * this._step(stateObj)));
+    this._setpoint.commit(next);
     this.callService("climate", "set_temperature", { temperature: Number(next.toFixed(1)) });
   }
 
@@ -210,7 +219,7 @@ export class SkeuoClimateCard extends SkeuoBaseCard<ClimateCardConfig> {
           .width=${222}
           .height=${112}
           .valueSize=${26}
-          .value=${target !== undefined ? `${this._formatSetpoint()}${this._unit}` : "—"}
+          .value=${target !== undefined ? this._formatSetpoint() : "—"}
           .label=${`${t(this.hass, "setpoint")} · ${actionLabel ?? stateLabel}`}
           .color=${color}
         ></skeuo-screen>

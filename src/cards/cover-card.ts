@@ -74,7 +74,7 @@ export class SkeuoCoverCard extends SkeuoBaseCard {
    * jusqu'où l'utilisateur l'avait déjà amené.
    */
   private _onFaderChange(ev: CustomEvent): void {
-    this._shown.set(ev.detail.value, true);
+    this._shown.commit(ev.detail.value);
     this.callService("cover", "set_cover_position", { position: ev.detail.value });
   }
 

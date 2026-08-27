@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Consignes</title>
+<style>
+  html, body { margin: 0; background: #111214; color: #ddd; font-family: Roboto, system-ui, sans-serif; }
+  .wrap { padding: 20px; }
+  pre { background: #0b0c0d; padding: 12px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+  .banc { position: fixed; left: -9999px; top: 0; width: 492px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>Tenue de la consigne locale</h2>
+  <pre id="rapport">mesure en cours</pre>
+</div>
+<div class="banc" id="banc"></div>
+<script type="module">
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const socle = { last_changed: "", last_updated: "", context: {} };
+
+const etats = {
+  "light.salon": { entity_id: "light.salon", state: "on", ...socle, attributes: {
+    friendly_name: "Plafonnier", brightness: 128, supported_color_modes: ["color_temp"],
+    min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500, color_temp_kelvin: 3200 } },
+  "cover.salon": { entity_id: "cover.salon", state: "open", ...socle, attributes: {
+    friendly_name: "Store", current_position: 40, supported_features: 15 } },
+  "fan.bureau": { entity_id: "fan.bureau", state: "on", ...socle, attributes: {
+    friendly_name: "Ventilateur", percentage: 40, percentage_step: 10, supported_features: 1 } },
+  "media_player.salon": { entity_id: "media_player.salon", state: "playing", ...socle, attributes: {
+    friendly_name: "Salon", volume_level: 0.4, media_title: "Titre",
+    supported_features: 1 | 4 | 16 | 32 | 4096 | 16384 } },
+  "water_heater.ballon": { entity_id: "water_heater.ballon", state: "eco", ...socle, attributes: {
+    friendly_name: "Ballon", temperature: 50, min_temp: 30, max_temp: 65, operation_list: ["eco", "performance", "off"] } },
+  "climate.chambre": { entity_id: "climate.chambre", state: "heat", ...socle, attributes: {
+    friendly_name: "Thermostat", temperature: 19, current_temperature: 18.4,
+    target_temp_step: 0.5, min_temp: 7, max_temp: 35, hvac_modes: ["heat", "cool", "off"] } },
+};
+
+let appels = [];
+const faireHass = (etats) => ({
+  states: etats, themes: { darkMode: true }, locale: { language: "fr" }, language: "fr",
+  connected: true, config: { state: "RUNNING", unit_system: { temperature: "°C" } },
+  localize: () => "", formatEntityState: (s) => `${s.state}`,
+  callService: (d, s, data) => { appels.push(`${d}.${s}`); return Promise.resolve(); },
+});
+
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+const banc = document.getElementById("banc");
+
+/** Rejoue la séquence réelle : rendu, geste, puis échos périmés de l'entité. */
+const eprouver = async ({ carte, entite, geste, lire, attendu, apres }) => {
+  const el = document.createElement(carte);
+  el.setConfig({ type: `custom:${carte}`, entity: entite });
+  banc.appendChild(el);
+  el.hass = faireHass(etats);
+  await el.updateComplete;
+  await attendre(50);
+
+  const avant = lire(el);
+  appels = [];
+  geste(el);
+  await el.updateComplete;
+  await attendre(60);
+  const juste_apres = lire(el);
+
+  // Home Assistant continue d'annoncer l'ancienne valeur le temps que
+  // l'appareil réponde : nouvel objet hass, nouvel objet d'état, même contenu.
+  for (let i = 0; i < 4; i++) {
+    const copie = { ...etats[entite], attributes: { ...etats[entite].attributes }, last_updated: String(i) };
+    el.hass = faireHass({ ...etats, [entite]: copie });
+    await el.updateComplete;
+    await attendre(60);
+  }
+  const apres_echos = lire(el);
+
+  // L'appareil confirme enfin, avec la valeur demandée.
+  const confirme = { ...etats[entite], attributes: { ...etats[entite].attributes, ...apres }, last_updated: "final" };
+  el.hass = faireHass({ ...etats, [entite]: confirme });
+  await el.updateComplete;
+  await attendre(900);
+  const apres_confirmation = lire(el);
+
+  el.remove();
+  return {
+    carte: carte.replace("skeuo-", "").replace("-card", ""),
+    avant, juste_apres, apres_echos, apres_confirmation, attendu,
+    service: appels[0] ?? null,
+    tenu: Math.abs(apres_echos - attendu) < 1.5,
+    suivi: Math.abs(apres_confirmation - attendu) < 1.5,
+  };
+};
+
+// Les animations passent par requestAnimationFrame, qui ne tourne pas dans un
+// onglet caché. Sans ce contrôle, une valeur restée figée se lit comme un
+// défaut du code alors que c'est le banc qui dort.
+const rafVivant = await new Promise((resolve) => {
+  let images = 0;
+  const t0 = performance.now();
+  const boucle = () => {
+    images += 1;
+    if (performance.now() - t0 < 200) requestAnimationFrame(boucle);
+    else resolve(images > 3);
+  };
+  requestAnimationFrame(boucle);
+  setTimeout(() => resolve(false), 1500);
+});
+
+const rapport = [];
+
+rapport.push(await eprouver({
+  carte: "skeuo-light-card", entite: "light.salon",
+  geste: (el) => el._setBrightness(90),
+  lire: (el) => el._brightness.value, attendu: 90,
+  apres: { brightness: 230 },
+}));
+
+rapport.push(await eprouver({
+  carte: "skeuo-cover-card", entite: "cover.salon",
+  geste: (el) => el._onFaderChange({ detail: { value: 85 } }),
+  lire: (el) => el._shown.value, attendu: 85,
+  apres: { current_position: 85 },
+}));
+
+rapport.push(await eprouver({
+  carte: "skeuo-fan-card", entite: "fan.bureau",
+  geste: (el) => el._onFaderChange({ detail: { value: 80 } }),
+  lire: (el) => el._speed.value, attendu: 80,
+  apres: { percentage: 80 },
+}));
+
+rapport.push(await eprouver({
+  carte: "skeuo-media-card", entite: "media_player.salon",
+  geste: (el) => el._onVolume({ detail: { value: 75 } }),
+  lire: (el) => el._volume.value, attendu: 75,
+  apres: { volume_level: 0.75 },
+}));
+
+rapport.push(await eprouver({
+  carte: "skeuo-water-heater-card", entite: "water_heater.ballon",
+  geste: (el) => el._onFaderChange({ detail: { value: 60 } }),
+  lire: (el) => el._setpoint.value, attendu: 60,
+  apres: { temperature: 60 },
+}));
+
+// Le thermostat n'a pas de curseur : trois appuis rapides doivent cumuler.
+rapport.push(await eprouver({
+  carte: "skeuo-climate-card", entite: "climate.chambre",
+  geste: (el) => { const s = el.stateObj; el._nudge(s, 1); el._nudge(s, 1); el._nudge(s, 1); },
+  lire: (el) => el._setpoint.value, attendu: 20.5,
+  apres: { temperature: 20.5 },
+}));
+
+// L'appareil borne la demande : la carte doit suivre ce qu'il annonce, pas
+// rester sur une consigne que personne n'a honorée.
+rapport.push(await eprouver({
+  carte: "skeuo-light-card", entite: "light.salon",
+  geste: (el) => el._setBrightness(90),
+  lire: (el) => el._brightness.value, attendu: 60,
+  apres: { brightness: 153 },
+}));
+
+// Aucun geste local : un changement venu d'ailleurs doit passer normalement.
+rapport.push(await eprouver({
+  carte: "skeuo-light-card", entite: "light.salon",
+  geste: () => {},
+  lire: (el) => el._brightness.value, attendu: 25,
+  apres: { brightness: 64 },
+}));
+
+const sortie = { rafVivant, cas: rapport };
+document.getElementById("rapport").textContent = JSON.stringify(sortie, null, 1);
+window.rapport = sortie;
+</script>
+</body>
+</html>

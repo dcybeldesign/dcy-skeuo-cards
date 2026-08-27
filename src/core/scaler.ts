@@ -26,6 +26,15 @@ export const DESIGN = { width: 615, height: 310 } as const;
 /** Clé portée par la demande de rendu quand le facteur change. */
 export const SCALE_PROPERTY = "skeuoScale";
 
+/**
+ * Calibre nominal des vis d'angle et leur retrait par rapport au bord, en
+ * unités de design. Les vis sont posées dans l'espace de la carte et non dans
+ * le plan, pour rester accrochées aux quatre coins quel que soit le format de
+ * la cellule ; le facteur leur est donc appliqué explicitement.
+ */
+export const SCREW_SIZE = 16;
+export const SCREW_INSET = 10;
+
 /** Au-delà, les éléments s'éloigneraient trop les uns des autres. */
 const MAX_STAGE_WIDTH = 1000;
 

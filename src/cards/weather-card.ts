@@ -3,7 +3,7 @@ import { customElement } from "lit/decorators.js";
 
 import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/base-card";
 import { type HassEntity, isUnavailable, numericState } from "../core/ha";
-import { fitValueSize, trimNumber } from "../core/format";
+import { fitValueSize, formatAttribute } from "../core/format";
 import { domainRequired, formatState } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 
@@ -71,7 +71,9 @@ export class SkeuoWeatherCard extends SkeuoBaseCard {
     const temperature = numericState(stateObj.attributes.temperature);
     const condition = formatState(this.hass, stateObj);
     const text =
-      dead || temperature === undefined ? "—" : `${trimNumber(temperature)}${this._unit(stateObj)}`;
+      dead || temperature === undefined
+        ? "—"
+        : formatAttribute(this.hass, stateObj, "temperature", this._unit(stateObj));
 
     return html`
       <skeuo-screen bare>

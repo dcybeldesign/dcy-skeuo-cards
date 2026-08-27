@@ -25,7 +25,7 @@ import {
   isUnavailable,
 } from "./ha";
 import { t, wrongDomain } from "./localize";
-import { DESIGN, ScaleController, rowsForColumns } from "./scaler";
+import { DESIGN, SCREW_INSET, SCREW_SIZE, ScaleController, rowsForColumns } from "./scaler";
 import { chromeStyles } from "../styles/chrome";
 
 export type MaterialName = "carbon" | "graphite" | "brushed";
@@ -255,6 +255,12 @@ export abstract class SkeuoBaseCard<
         style=${styleMap({
           "--skeuo-accent": this.accent,
           "--skeuo-texture": String(this.textureScale),
+          // Les vis vivent dans l'espace de la carte pour rester accrochées à
+          // ses coins, elles ne bénéficient donc pas du scale() du plan. On
+          // leur applique le facteur à la main, sur le calibre nominal de 16 px
+          // et son retrait de 10 px.
+          "--skeuo-screw": `${SCREW_SIZE * this._scaler.scale}px`,
+          "--skeuo-screw-inset": `${SCREW_INSET * this._scaler.scale}px`,
         })}
       >
         ${config.screws !== false ? this._renderScrews() : nothing}

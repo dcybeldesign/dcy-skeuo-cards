@@ -9,7 +9,7 @@ import { customElement } from "lit/decorators.js";
 
 import { DEFAULT_TEXTURE, SkeuoBaseCard, type SkeuoBaseConfig } from "../core/base-card";
 import { type HassEntity, isUnavailable, numericState } from "../core/ha";
-import { fitValueSize } from "../core/format";
+import { fitValueSize, formatFixed } from "../core/format";
 import { domainRequired, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 import { SmoothValue } from "../core/smooth";
@@ -134,7 +134,7 @@ export class SkeuoWaterHeaterCard extends SkeuoBaseCard<WaterHeaterCardConfig> {
   /* ------------------------------------------------------------- actions */
 
   private _onFaderChange(ev: CustomEvent): void {
-    this._setpoint.set(ev.detail.value, true);
+    this._setpoint.commit(ev.detail.value);
     this.callService("water_heater", "set_temperature", { temperature: ev.detail.value });
   }
 
@@ -159,7 +159,10 @@ export class SkeuoWaterHeaterCard extends SkeuoBaseCard<WaterHeaterCardConfig> {
     const showsCurrent = current !== undefined;
     const shown = showsCurrent ? current : this._setpoint.value;
     const decimals = step < 1 ? 1 : 0;
-    const text = target === undefined && !showsCurrent ? "—" : `${shown.toFixed(decimals)}${this._unit}`;
+    const text =
+      target === undefined && !showsCurrent
+        ? "—"
+        : formatFixed(this.hass, shown, decimals, this._unit);
 
     return html`
       <skeuo-fader

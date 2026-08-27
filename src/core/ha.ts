@@ -65,6 +65,8 @@ export interface HassConnection {
 
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
+  /** Registre des entites du frontend, porteur de la precision reglee a la main. */
+  entities?: Record<string, { display_precision?: number | null } | undefined>;
   connection?: HassConnection;
   themes: HassTheme;
   locale: FrontendLocaleData;

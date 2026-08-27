@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Valeurs</title>
+<style>
+  html, body { margin: 0; background: #111214; color: #ddd; font-family: Roboto, system-ui, sans-serif; }
+  .wrap { padding: 20px; }
+  pre { background: #0b0c0d; padding: 12px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+  .banc { position: fixed; left: -9999px; top: 0; width: 492px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>Tenue des relevés dans l'écran</h2>
+  <pre id="rapport">mesure en cours</pre>
+</div>
+<div class="banc" id="banc"></div>
+<script type="module">
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const socle = { last_changed: "", last_updated: "", context: {} };
+const banc = document.getElementById("banc");
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Home Assistant met en forme lui-même : précision de l'entité, séparateur
+ * décimal de la langue, espace insécable avant l'unité. On rejoue ce contrat
+ * plutôt que d'inventer un format, sinon le banc valide autre chose que ce que
+ * l'utilisateur verra.
+ */
+const formatHA = (s) => {
+  const brut = Number(s.state);
+  const p = s.attributes.suggested_display_precision;
+  const nombre = Number.isFinite(brut)
+    ? new Intl.NumberFormat("fr", p === undefined
+        ? { maximumFractionDigits: 2 }
+        : { minimumFractionDigits: p, maximumFractionDigits: p }).format(brut)
+    : s.state;
+  const unite = s.attributes.unit_of_measurement;
+  return unite ? `${nombre} ${unite}` : nombre;
+};
+
+const CAS = [
+  { id: "sensor.humidite", state: "58.333333", classe: "humidity", unite: "%", precision: 0 },
+  { id: "sensor.temperature", state: "21.34567", classe: "temperature", unite: "°C", precision: 1 },
+  { id: "sensor.puissance", state: "1234.5678", classe: "power", unite: "W", precision: 1 },
+  { id: "sensor.energie", state: "12345.678", classe: "energy", unite: "kWh", precision: 2 },
+  { id: "sensor.pression", state: "1013.2567", classe: "pressure", unite: "hPa", precision: 1 },
+  { id: "sensor.co2", state: "1487.0", classe: "carbon_dioxide", unite: "ppm", precision: 0 },
+  { id: "sensor.negatif", state: "-12.3456", classe: "temperature", unite: "°C", precision: 1 },
+  { id: "sensor.sans_precision", state: "58.333333", classe: "humidity", unite: "%", precision: undefined },
+];
+
+const resultats = [];
+
+for (const cas of CAS) {
+  const stateObj = {
+    entity_id: cas.id, state: cas.state, ...socle,
+    attributes: {
+      friendly_name: "Capteur", device_class: cas.classe, unit_of_measurement: cas.unite,
+      ...(cas.precision === undefined ? {} : { suggested_display_precision: cas.precision }),
+    },
+  };
+  const hass = {
+    states: { [cas.id]: stateObj }, themes: {}, locale: { language: "fr" }, language: "fr",
+    connected: true, config: { state: "RUNNING", unit_system: { temperature: "°C" } },
+    localize: () => "", formatEntityState: formatHA, callService: () => Promise.resolve(),
+  };
+
+  const el = document.createElement("skeuo-sensor-card");
+  el.setConfig({ type: "custom:skeuo-sensor-card", entity: cas.id });
+  banc.appendChild(el);
+  el.hass = hass;
+  await el.updateComplete;
+  await attendre(60);
+
+  const ecran = el.shadowRoot.querySelector("skeuo-screen");
+  await ecran.updateComplete;
+  const texte = ecran.shadowRoot.querySelector(".value");
+  const cadre = ecran.shadowRoot.querySelector(".frame") ?? texte.parentElement;
+
+  // scrollWidth d'un bloc vaut la largeur du bloc, pas celle du texte : il ne
+  // dirait jamais rien. On mesure la ligne elle-même, transform compris, et on
+  // la compare au cadre mesuré de la même façon.
+  const plage = document.createRange();
+  plage.selectNodeContents(texte);
+  const ligne = plage.getBoundingClientRect();
+  const boite = cadre.getBoundingClientRect();
+
+  resultats.push({
+    capteur: cas.id.replace("sensor.", ""),
+    brut: cas.state,
+    affiche: texte.textContent.trim(),
+    taille: Math.round(parseFloat(getComputedStyle(texte).fontSize) * 10) / 10,
+    largeurTexte: Math.round(ligne.width * 10) / 10,
+    largeurCadre: Math.round(boite.width * 10) / 10,
+    marge: Math.round((boite.width - ligne.width) * 10) / 10,
+    deborde: ligne.width > boite.width + 0.5,
+  });
+  el.remove();
+}
+
+const sortie = { debordements: resultats.filter((r) => r.deborde).length, resultats };
+document.getElementById("rapport").textContent = JSON.stringify(sortie, null, 1);
+window.rapport = sortie;
+</script>
+</body>
+</html>

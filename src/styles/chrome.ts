@@ -132,17 +132,26 @@ export const chromeStyles = css`
 
   /* ------------------------------------------------------------- vis */
 
+  /* Les vis restent accrochées aux coins de la carte, pas à ceux du plan, mais
+     leur taille suit le facteur d'échelle comme tout le reste. Sans ça une vis
+     gardait ses 16 px sur une carte étroite comme sur une large, occupait deux
+     fois plus de place en proportion sur la petite, et mordait sur le titre.
+     Le calibre nominal est 16 px pour un facteur de 1, d'où les fractions de
+     la variable employées ci-dessous pour les ombres et l'empreinte. */
   .screw {
     position: absolute;
     z-index: 3;
-    width: 16px;
-    height: 16px;
+    width: var(--skeuo-screw, 16px);
+    height: var(--skeuo-screw, 16px);
     border-radius: 50%;
     background: radial-gradient(circle at 34% 30%, #7d7d7d 0%, #4a4a4a 38%, #2a2a2a 72%, #151515 100%);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.22),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.65),
-      1px 1px 3px rgba(0, 0, 0, 0.6);
+      inset 0 calc(var(--skeuo-screw, 16px) * 0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        rgba(255, 255, 255, 0.22),
+      inset 0 calc(var(--skeuo-screw, 16px) * -0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        rgba(0, 0, 0, 0.65),
+      calc(var(--skeuo-screw, 16px) * 0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        calc(var(--skeuo-screw, 16px) * 0.1875) rgba(0, 0, 0, 0.6);
   }
   /* Empreinte cruciforme, deux barres croisées légèrement décentrées pour
      rester cohérentes avec la lumière en haut-gauche. */
@@ -153,20 +162,20 @@ export const chromeStyles = css`
     inset: 0;
     margin: auto;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.14));
-    border-radius: 1px;
+    border-radius: calc(var(--skeuo-screw, 16px) * 0.0625);
   }
   .screw::before {
     width: 62%;
-    height: 2px;
+    height: calc(var(--skeuo-screw, 16px) * 0.125);
   }
   .screw::after {
-    width: 2px;
+    width: calc(var(--skeuo-screw, 16px) * 0.125);
     height: 62%;
   }
-  .screw.tl { top: 10px; left: 10px; }
-  .screw.tr { top: 10px; right: 10px; }
-  .screw.bl { bottom: 10px; left: 10px; }
-  .screw.br { bottom: 10px; right: 10px; }
+  .screw.tl { top: var(--skeuo-screw-inset, 10px); left: var(--skeuo-screw-inset, 10px); }
+  .screw.tr { top: var(--skeuo-screw-inset, 10px); right: var(--skeuo-screw-inset, 10px); }
+  .screw.bl { bottom: var(--skeuo-screw-inset, 10px); left: var(--skeuo-screw-inset, 10px); }
+  .screw.br { bottom: var(--skeuo-screw-inset, 10px); right: var(--skeuo-screw-inset, 10px); }
 
   /* --------------------------------------------------- plan de référence */
 
@@ -189,8 +198,13 @@ export const chromeStyles = css`
     box-sizing: border-box;
   }
 
+  /* Le retrait latéral dégage les deux vis du haut. Le plan démarre déjà à 26,
+     soit exactement le bord droit de la vis, ce qui laissait le titre au
+     contact. Les 8 unités supplémentaires ouvrent un écart visible, et le
+     corps de la carte reste aligné sur 26. */
   .head {
     flex: none;
+    margin-inline: 8px;
     border-radius: 6px;
     outline: none;
   }

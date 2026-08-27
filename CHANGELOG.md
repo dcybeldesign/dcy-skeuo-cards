@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.2
+- Card titles no longer start underneath the top-left screw. The screws were
+  drawn at a fixed 16 px while everything else followed the scale factor, so
+  on a 492 px card the title began 5 px inside the screw and on a 300 px card
+  13 px inside it. Screws now scale like the rest of the plane, keeping the
+  same relative size at every card width, and the title strip clears them on
+  both sides.
+- The engraved line on the horizontal fader cap now runs across the travel
+  instead of along it, the way an index mark reads against a scale on a real
+  desk. The vertical faders were already correct.
+- Controls stay where you leave them. Setting a brightness, a blind position,
+  a fan speed, a volume or a water heater setpoint no longer snaps back to the
+  previous value and travels the same path again once the device confirms.
+  The card holds the value you set until the entity actually moves, or until
+  the command has clearly been lost.
+- The thermostat setpoint now reacts on press instead of on reply, and
+  repeated presses accumulate. Three taps on plus used to compute the same
+  single step three times while the thermostat had yet to answer, so the
+  setpoint only advanced by one.
+- Numeric readings follow the display precision Home Assistant holds for each
+  entity, set by hand in its options or proposed by the integration, along
+  with the decimal separator and the space before the unit. A sensor reporting
+  58.333333 showed exactly that; it now reads 58 % like everywhere else in the
+  dashboard. Compact forms keep their glued degree sign: the thermostat dial
+  and the forecast strip.
+
 ## 1.0.1
 - Fixed the card height in Masonry views. Size was declared through
   `getGridOptions()` alone, which Sections views honour and Masonry views

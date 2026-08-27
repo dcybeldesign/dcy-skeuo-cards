@@ -982,6 +982,8 @@ const domainRequired = (domain, hass) => isFrench(hass) ? `\`entity\` doit être
 const wrongDomain = (entityId, domains, hass) => isFrench(hass) ? `\`${entityId}\` n'est pas utilisable ici (domaines acceptés : ${domains.join(", ")})` : `\`${entityId}\` cannot be used here (accepted domains: ${domains.join(", ")})`;
 const DESIGN = { width: 615, height: 310 };
 const SCALE_PROPERTY = "skeuoScale";
+const SCREW_SIZE = 16;
+const SCREW_INSET = 10;
 const MAX_STAGE_WIDTH = 1e3;
 const GRID_ROW_HEIGHT = 56;
 const GRID_ROW_GAP = 8;
@@ -1159,17 +1161,26 @@ const chromeStyles = i$5`
 
   /* ------------------------------------------------------------- vis */
 
+  /* Les vis restent accrochées aux coins de la carte, pas à ceux du plan, mais
+     leur taille suit le facteur d'échelle comme tout le reste. Sans ça une vis
+     gardait ses 16 px sur une carte étroite comme sur une large, occupait deux
+     fois plus de place en proportion sur la petite, et mordait sur le titre.
+     Le calibre nominal est 16 px pour un facteur de 1, d'où les fractions de
+     la variable employées ci-dessous pour les ombres et l'empreinte. */
   .screw {
     position: absolute;
     z-index: 3;
-    width: 16px;
-    height: 16px;
+    width: var(--skeuo-screw, 16px);
+    height: var(--skeuo-screw, 16px);
     border-radius: 50%;
     background: radial-gradient(circle at 34% 30%, #7d7d7d 0%, #4a4a4a 38%, #2a2a2a 72%, #151515 100%);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.22),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.65),
-      1px 1px 3px rgba(0, 0, 0, 0.6);
+      inset 0 calc(var(--skeuo-screw, 16px) * 0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        rgba(255, 255, 255, 0.22),
+      inset 0 calc(var(--skeuo-screw, 16px) * -0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        rgba(0, 0, 0, 0.65),
+      calc(var(--skeuo-screw, 16px) * 0.0625) calc(var(--skeuo-screw, 16px) * 0.0625)
+        calc(var(--skeuo-screw, 16px) * 0.1875) rgba(0, 0, 0, 0.6);
   }
   /* Empreinte cruciforme, deux barres croisées légèrement décentrées pour
      rester cohérentes avec la lumière en haut-gauche. */
@@ -1180,20 +1191,20 @@ const chromeStyles = i$5`
     inset: 0;
     margin: auto;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(255, 255, 255, 0.14));
-    border-radius: 1px;
+    border-radius: calc(var(--skeuo-screw, 16px) * 0.0625);
   }
   .screw::before {
     width: 62%;
-    height: 2px;
+    height: calc(var(--skeuo-screw, 16px) * 0.125);
   }
   .screw::after {
-    width: 2px;
+    width: calc(var(--skeuo-screw, 16px) * 0.125);
     height: 62%;
   }
-  .screw.tl { top: 10px; left: 10px; }
-  .screw.tr { top: 10px; right: 10px; }
-  .screw.bl { bottom: 10px; left: 10px; }
-  .screw.br { bottom: 10px; right: 10px; }
+  .screw.tl { top: var(--skeuo-screw-inset, 10px); left: var(--skeuo-screw-inset, 10px); }
+  .screw.tr { top: var(--skeuo-screw-inset, 10px); right: var(--skeuo-screw-inset, 10px); }
+  .screw.bl { bottom: var(--skeuo-screw-inset, 10px); left: var(--skeuo-screw-inset, 10px); }
+  .screw.br { bottom: var(--skeuo-screw-inset, 10px); right: var(--skeuo-screw-inset, 10px); }
 
   /* --------------------------------------------------- plan de référence */
 
@@ -1216,8 +1227,13 @@ const chromeStyles = i$5`
     box-sizing: border-box;
   }
 
+  /* Le retrait latéral dégage les deux vis du haut. Le plan démarre déjà à 26,
+     soit exactement le bord droit de la vis, ce qui laissait le titre au
+     contact. Les 8 unités supplémentaires ouvrent un écart visible, et le
+     corps de la carte reste aligné sur 26. */
   .head {
     flex: none;
+    margin-inline: 8px;
     border-radius: 6px;
     outline: none;
   }
@@ -1458,7 +1474,13 @@ class SkeuoBaseCard extends i$2 {
     })}
         style=${o({
       "--skeuo-accent": this.accent,
-      "--skeuo-texture": String(this.textureScale)
+      "--skeuo-texture": String(this.textureScale),
+      // Les vis vivent dans l'espace de la carte pour rester accrochées à
+      // ses coins, elles ne bénéficient donc pas du scale() du plan. On
+      // leur applique le facteur à la main, sur le calibre nominal de 16 px
+      // et son retrait de 10 px.
+      "--skeuo-screw": `${SCREW_SIZE * this._scaler.scale}px`,
+      "--skeuo-screw-inset": `${SCREW_INSET * this._scaler.scale}px`
     })}
       >
         ${config.screws !== false ? this._renderScrews() : A}
@@ -1684,6 +1706,8 @@ const baseSchema = () => [
 const TICK = "__skeuoSmoothTick";
 const easeInOutCubic = (t2) => t2 < 0.5 ? 4 * t2 * t2 * t2 : 1 - Math.pow(-2 * t2 + 2, 3) / 2;
 const prefersReducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const PENDING_TIMEOUT = 6e3;
+const now = () => typeof performance !== "undefined" ? performance.now() : Date.now();
 class SmoothValue {
   constructor(host, options = {}) {
     this._current = 0;
@@ -1693,8 +1717,9 @@ class SmoothValue {
     this._duration = 0;
     this._initialised = false;
     this._seq = 0;
-    this._tick = (now) => {
-      const elapsed = now - this._startedAt;
+    this._pendingSince = 0;
+    this._tick = (now2) => {
+      const elapsed = now2 - this._startedAt;
       const t2 = this._duration === 0 ? 1 : Math.min(1, elapsed / this._duration);
       this._current = this._from + (this._target - this._from) * easeInOutCubic(t2);
       if (t2 >= 1) {
@@ -1722,6 +1747,14 @@ class SmoothValue {
     return this._frame !== void 0;
   }
   /**
+   * Valeur visée, animation comprise. C'est elle qu'il faut prendre pour base
+   * quand l'utilisateur enchaîne les appuis : repartir de l'entité ferait
+   * calculer trois fois le même pas tant qu'elle n'a pas répondu.
+   */
+  get goal() {
+    return this._target;
+  }
+  /**
    * Vise une nouvelle valeur.
    *
    * `immediate` sert quand le changement vient du geste de l'utilisateur
@@ -1730,6 +1763,14 @@ class SmoothValue {
    */
   set(target, immediate = false) {
     if (!Number.isFinite(target)) return;
+    if (!immediate) {
+      this._lastFromState = target;
+      if (this._pendingFrom !== void 0) {
+        const attente = now() - this._pendingSince;
+        if (target === this._pendingFrom && attente < PENDING_TIMEOUT) return;
+        this._pendingFrom = void 0;
+      }
+    }
     if (!this._initialised) {
       this._initialised = true;
       this._current = target;
@@ -1759,6 +1800,20 @@ class SmoothValue {
     this._startedAt = performance.now();
     if (this._frame === void 0) this._frame = requestAnimationFrame(this._tick);
   }
+  /**
+   * Consigne posée par l'utilisateur. Le contrôle s'y place tout de suite et y
+   * reste, au lieu de retomber sur ce que l'entité continue d'annoncer le temps
+   * que l'appareil réponde. Ce que l'on retient n'est pas la valeur demandée
+   * mais celle que l'entité affichait à cet instant : dès qu'elle en change,
+   * quelle qu'elle soit, on lui rend la main. Un appareil qui borne la demande
+   * ou qui refuse la commande reprend donc la main sans cas particulier.
+   */
+  commit(target) {
+    if (!Number.isFinite(target)) return;
+    this._pendingFrom = this._lastFromState;
+    this._pendingSince = now();
+    this.set(target, true);
+  }
   /** Marque un changement que Lit ne peut pas prendre pour un non-événement. */
   _notify() {
     const previous = this._seq;
@@ -1773,6 +1828,7 @@ class SmoothValue {
   }
   hostDisconnected() {
     this._cancel();
+    this._pendingFrom = void 0;
   }
 }
 var __defProp$c = Object.defineProperty;
@@ -2823,7 +2879,7 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
    * relâchement pour re-parcourir le trajet que l'utilisateur venait de faire.
    */
   _setBrightness(pct) {
-    this._brightness.set(pct, true);
+    this._brightness.commit(pct);
     if (pct <= 0) {
       this.callService("light", "turn_off");
       return;
@@ -2916,6 +2972,50 @@ registerCard({
   },
   preview: true
 });
+const NBSP = " ";
+const entityPrecision = (hass, stateObj) => {
+  const set = hass?.entities?.[stateObj.entity_id]?.display_precision;
+  if (typeof set === "number") return set;
+  const suggested = stateObj.attributes.suggested_display_precision;
+  return typeof suggested === "number" ? suggested : void 0;
+};
+const localNumber = (hass, value, precision) => {
+  const language = hass?.locale?.language ?? hass?.language;
+  const options = precision === void 0 ? { maximumFractionDigits: 2 } : { minimumFractionDigits: precision, maximumFractionDigits: precision };
+  try {
+    return new Intl.NumberFormat(language, options).format(value);
+  } catch {
+    return precision === void 0 ? String(value) : value.toFixed(precision);
+  }
+};
+const formatAttribute = (hass, stateObj, attribute, unit) => {
+  const done = hass?.formatEntityAttributeValue?.(stateObj, attribute);
+  if (done) return done;
+  const value = Number(stateObj.attributes[attribute]);
+  if (!Number.isFinite(value)) return "";
+  return withUnit(localNumber(hass, value, entityPrecision(hass, stateObj)), unit);
+};
+const formatFixed = (hass, value, decimals, unit) => withUnit(localNumber(hass, value, decimals), unit);
+const withUnit = (text, unit) => unit ? `${text}${NBSP}${unit}` : text;
+const VALUE_SIZE = 44.1;
+const fitValueSize = (text) => {
+  const length = text.length;
+  if (length <= 5) return VALUE_SIZE;
+  if (length <= 7) return 36;
+  if (length <= 9) return 29;
+  if (length <= 12) return 24;
+  return 19;
+};
+const trimNumber = (value) => {
+  const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+  return String(rounded);
+};
+const shortTime = (iso, language) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
+};
 const box = (inner, size = 16) => w`<svg width=${size} height=${size} viewBox="0 0 16 16">${inner}</svg>`;
 const iconPower = () => box(w`
     <path fill="none" stroke="currentColor" d="M11.44 4.08 A6 6 0 1 1 4.56 4.08" stroke-width="1.6" stroke-linecap="round"/>
@@ -3474,7 +3574,7 @@ let SkeuoClimateCard = class extends SkeuoBaseCard {
   _formatSetpoint() {
     const step = this._step(this.stateObj);
     const decimals = step < 1 ? 1 : 0;
-    return this._setpoint.value.toFixed(decimals);
+    return formatFixed(this.hass, this._setpoint.value, decimals, this._unit);
   }
   _actionColor(stateObj) {
     const action = stateObj.attributes.hvac_action;
@@ -3492,12 +3592,20 @@ let SkeuoClimateCard = class extends SkeuoBaseCard {
       this.callService("climate", "set_hvac_mode", { hvac_mode: "off" });
     }
   }
+  /**
+   * Le pas s'applique à la valeur affichée, pas à celle de l'entité. Sans ça,
+   * trois appuis rapides sur le plus calculent trois fois le même degré tant
+   * que le thermostat n'a pas confirmé le premier, et la consigne n'avance que
+   * d'un cran. La consigne est posée localement dans la foulée, pour que
+   * l'écran et le cadran bougent à l'appui et non à la réponse.
+   */
   _nudge(stateObj, direction) {
-    const current = this._target(stateObj);
-    if (current === void 0) return;
+    if (this._target(stateObj) === void 0) return;
     const min = numericState(stateObj.attributes.min_temp) ?? 7;
     const max = numericState(stateObj.attributes.max_temp) ?? 35;
-    const next = Math.min(max, Math.max(min, current + direction * this._step(stateObj)));
+    const base = this._setpoint.goal;
+    const next = Math.min(max, Math.max(min, base + direction * this._step(stateObj)));
+    this._setpoint.commit(next);
     this.callService("climate", "set_temperature", { temperature: Number(next.toFixed(1)) });
   }
   /* --------------------------------------------------------------- rendu */
@@ -3535,7 +3643,7 @@ let SkeuoClimateCard = class extends SkeuoBaseCard {
           .width=${222}
           .height=${112}
           .valueSize=${26}
-          .value=${target !== void 0 ? `${this._formatSetpoint()}${this._unit}` : "—"}
+          .value=${target !== void 0 ? this._formatSetpoint() : "—"}
           .label=${`${t(this.hass, "setpoint")} · ${actionLabel ?? stateLabel}`}
           .color=${color}
         ></skeuo-screen>
@@ -3697,7 +3805,7 @@ let SkeuoCoverCard = class extends SkeuoBaseCard {
    * jusqu'où l'utilisateur l'avait déjà amené.
    */
   _onFaderChange(ev) {
-    this._shown.set(ev.detail.value, true);
+    this._shown.commit(ev.detail.value);
     this.callService("cover", "set_cover_position", { position: ev.detail.value });
   }
   /**
@@ -4086,6 +4194,7 @@ let SkeuoSensorCard = class extends SkeuoBaseCard {
     const { min, max, warn, danger } = this._range(stateObj);
     const unit = stateObj.attributes.unit_of_measurement ?? "";
     const name = computeEntityName(stateObj);
+    const releve = dead || value === void 0 ? "—" : formatState(this.hass, stateObj);
     return b`
       <skeuo-vu-meter
         .value=${value ?? min}
@@ -4098,23 +4207,12 @@ let SkeuoSensorCard = class extends SkeuoBaseCard {
       ></skeuo-vu-meter>
 
       <skeuo-screen
-        .value=${dead || value === void 0 ? "—" : `${value}${unit}`}
+        .value=${releve}
         .label=${name}
-        .valueSize=${this._valueSize(value, unit)}
+        .valueSize=${fitValueSize(releve)}
         .color=${dead ? "#6b5a44" : this.accent}
       ></skeuo-screen>
     `;
-  }
-  /**
-   * On réduit la taille plutôt que de laisser un long relevé déborder du
-   * cadre : la règle du projet interdit toute troncature de texte.
-   */
-  _valueSize(value, unit) {
-    const length = `${value ?? "—"}${unit}`.length;
-    if (length <= 5) return 44.1;
-    if (length <= 7) return 36;
-    if (length <= 9) return 29;
-    return 24;
   }
 };
 SkeuoSensorCard.styles = [
@@ -4137,25 +4235,6 @@ registerCard({
   },
   preview: true
 });
-const VALUE_SIZE = 44.1;
-const fitValueSize = (text) => {
-  const length = text.length;
-  if (length <= 5) return VALUE_SIZE;
-  if (length <= 7) return 36;
-  if (length <= 9) return 29;
-  if (length <= 12) return 24;
-  return 19;
-};
-const trimNumber = (value) => {
-  const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
-  return String(rounded);
-};
-const shortTime = (iso, language) => {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
-};
 var __getOwnPropDesc$d = Object.getOwnPropertyDescriptor;
 var __decorateClass$d = (decorators, target, key, kind) => {
   var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$d(target, key) : target;
@@ -4214,10 +4293,8 @@ let SkeuoSwitchCard = class extends SkeuoBaseCard {
     if (!entityId || !this.hass) return void 0;
     const stateObj = this.hass.states[entityId];
     if (!stateObj || isUnavailable(stateObj)) return void 0;
-    const value = numericState(stateObj.state);
-    if (value === void 0) return void 0;
-    const unit = stateObj.attributes.unit_of_measurement ?? "";
-    return `${trimNumber(value)}${unit}`;
+    if (numericState(stateObj.state) === void 0) return void 0;
+    return formatState(this.hass, stateObj);
   }
   _onToggle(stateObj) {
     const domain = computeDomain(stateObj.entity_id);
@@ -4513,7 +4590,7 @@ let SkeuoFanCard = class extends SkeuoBaseCard {
   }
   /* ------------------------------------------------------------- actions */
   _onFaderChange(ev) {
-    this._speed.set(ev.detail.value, true);
+    this._speed.commit(ev.detail.value);
     this.callService("fan", "set_percentage", { percentage: ev.detail.value });
   }
   _togglePower(stateObj) {
@@ -4695,7 +4772,7 @@ let SkeuoWaterHeaterCard = class extends SkeuoBaseCard {
   }
   /* ------------------------------------------------------------- actions */
   _onFaderChange(ev) {
-    this._setpoint.set(ev.detail.value, true);
+    this._setpoint.commit(ev.detail.value);
     this.callService("water_heater", "set_temperature", { temperature: ev.detail.value });
   }
   _setMode(mode) {
@@ -4711,7 +4788,7 @@ let SkeuoWaterHeaterCard = class extends SkeuoBaseCard {
     const showsCurrent = current !== void 0;
     const shown = showsCurrent ? current : this._setpoint.value;
     const decimals = step < 1 ? 1 : 0;
-    const text = target === void 0 && !showsCurrent ? "—" : `${shown.toFixed(decimals)}${this._unit}`;
+    const text = target === void 0 && !showsCurrent ? "—" : formatFixed(this.hass, shown, decimals, this._unit);
     return b`
       <skeuo-fader
         gradient="warmth"
@@ -5064,22 +5141,22 @@ const HORIZON = 26 * 36e5;
 const isNight = (hass, when) => {
   const sun = hass?.states["sun.sun"];
   if (!sun) return void 0;
-  const now = sun.state === "below_horizon";
-  if (!when) return now;
+  const now2 = sun.state === "below_horizon";
+  if (!when) return now2;
   const rising = Date.parse(sun.attributes.next_rising);
   const setting = Date.parse(sun.attributes.next_setting);
-  if (!Number.isFinite(rising) || !Number.isFinite(setting)) return now;
+  if (!Number.isFinite(rising) || !Number.isFinite(setting)) return now2;
   const target = when.getTime();
   const reference = Math.min(rising, setting);
-  if (target <= reference) return now;
-  if (rising - reference > HORIZON || setting - reference > HORIZON) return now;
+  if (target <= reference) return now2;
+  if (rising - reference > HORIZON || setting - reference > HORIZON) return now2;
   const events = [];
   for (let k2 = 0; k2 * DAY <= target - reference + DAY; k2++) {
     if (k2 > 10) break;
     events.push([rising + k2 * DAY, false], [setting + k2 * DAY, true]);
   }
   events.sort((a2, b2) => a2[0] - b2[0]);
-  let night = now;
+  let night = now2;
   for (const [at, nightAfter] of events) {
     if (at > target) break;
     night = nightAfter;
@@ -5496,7 +5573,7 @@ let SkeuoWeatherCard = class extends SkeuoBaseCard {
     const dead = isUnavailable(stateObj);
     const temperature = numericState(stateObj.attributes.temperature);
     const condition = formatState(this.hass, stateObj);
-    const text = dead || temperature === void 0 ? "—" : `${trimNumber(temperature)}${this._unit(stateObj)}`;
+    const text = dead || temperature === void 0 ? "—" : formatAttribute(this.hass, stateObj, "temperature", this._unit(stateObj));
     return b`
       <skeuo-screen bare>
         <skeuo-weather-icon
@@ -6062,9 +6139,12 @@ SkeuoHFader.styles = i$5`
         inset 2px 2px 4px rgba(0, 0, 0, 0.9),
         inset -1px -1px 1px rgba(255, 255, 255, 0.1);
     }
-    /* Le capuchon est plus haut que large, et son trait gravé court en travers
-       de la course : c'est ce qui distingue à l'oeil un fader horizontal d'un
-       fader vertical couché. */
+    /* Le capuchon est plus haut que large, et son trait gravé est perpendiculaire
+       à la course, donc vertical ici. C'est la règle sur une vraie table : le
+       trait sert d'index de position en face de la graduation, il coupe le
+       déplacement au lieu de le suivre. Le fader vertical du pack obtient le
+       même résultat avec un dégradé écrit vers la droite, parce que son curseur
+       est tourné de 90 degrés et que son repère local devient horizontal. */
     input[type="range"].fader::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 30px;
@@ -6074,7 +6154,7 @@ SkeuoHFader.styles = i$5`
       margin-top: -10px;
       border: 1px solid #c4bc9f;
       background:
-        linear-gradient(to bottom, transparent 46%, #111 46%, #111 54%, transparent 54%),
+        linear-gradient(to right, transparent 46%, #111 46%, #111 54%, transparent 54%),
         linear-gradient(to right, #fdfbf7 0%, #e8e3d2 10%, #f5f0e1 50%, #dcd6c0 90%, #b8b096 100%);
       box-shadow:
         -4px 4px 8px rgba(0, 0, 0, 0.6),
@@ -6101,7 +6181,7 @@ SkeuoHFader.styles = i$5`
       cursor: ew-resize;
       border: 1px solid #c4bc9f;
       background:
-        linear-gradient(to bottom, transparent 46%, #111 46%, #111 54%, transparent 54%),
+        linear-gradient(to right, transparent 46%, #111 46%, #111 54%, transparent 54%),
         linear-gradient(to right, #fdfbf7 0%, #e8e3d2 10%, #f5f0e1 50%, #dcd6c0 90%, #b8b096 100%);
       box-shadow:
         -4px 4px 8px rgba(0, 0, 0, 0.6),
@@ -6531,7 +6611,7 @@ let SkeuoMediaCard = class extends SkeuoBaseCard {
   }
   /* ------------------------------------------------------------- actions */
   _onVolume(ev) {
-    this._volume.set(ev.detail.value, true);
+    this._volume.commit(ev.detail.value);
     this.callService("media_player", "volume_set", { volume_level: ev.detail.value / 100 });
   }
   /**
@@ -7076,7 +7156,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.1"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc1"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );
