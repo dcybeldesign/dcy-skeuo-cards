@@ -1747,6 +1747,57 @@ const shortTime = (iso, language) => {
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString(language, { hour: "2-digit", minute: "2-digit" });
 };
+const PENDING_TIMEOUT$1 = 6e3;
+const now$1 = () => typeof performance !== "undefined" ? performance.now() : Date.now();
+const TICK$1 = "__skeuoHeldTick";
+class HeldValue {
+  /**
+   * L'hôte est facultatif, mais sans lui rien ne redessine la carte entre le
+   * geste et le prochain battement de `hass`. Le fader retomberait alors sur
+   * l'ancienne valeur le temps de cet intervalle, ce qui est précisément le
+   * défaut que cette classe corrige.
+   */
+  constructor(host) {
+    this._seq = 0;
+    this._pendingSince = 0;
+    this._host = host;
+  }
+  /**
+   * Valeur à afficher, connaissant celle de l'entité.
+   *
+   * Ce que l'on retient n'est pas la valeur demandée mais celle que l'entité
+   * annonçait au moment du geste : dès qu'elle en change, quelle qu'elle soit,
+   * on lui rend la main. Un appareil qui borne la demande, ou qui la refuse,
+   * reprend donc la main sans cas particulier.
+   */
+  read(fromState) {
+    if (this._pendingFrom === void 0) return fromState;
+    const attente = now$1() - this._pendingSince;
+    if (fromState !== this._pendingFrom || attente >= PENDING_TIMEOUT$1) {
+      this._pendingFrom = void 0;
+      this._local = void 0;
+      return fromState;
+    }
+    return this._local ?? fromState;
+  }
+  /** Consigne posée par l'utilisateur, à tenir jusqu'à confirmation. */
+  commit(value, fromState) {
+    if (!Number.isFinite(value)) return;
+    this._local = value;
+    this._pendingFrom = fromState;
+    this._pendingSince = now$1();
+    if (this._host) {
+      const previous = this._seq;
+      this._host[TICK$1] = ++this._seq;
+      this._host.requestUpdate(TICK$1, previous);
+    }
+  }
+  /** Au démontage, ce que dit l'entité fait autorité. */
+  reset() {
+    this._pendingFrom = void 0;
+    this._local = void 0;
+  }
+}
 const TICK = "__skeuoSmoothTick";
 const easeInOutCubic = (t2) => t2 < 0.5 ? 4 * t2 * t2 * t2 : 1 - Math.pow(-2 * t2 + 2, 3) / 2;
 const prefersReducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2779,6 +2830,8 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
   constructor() {
     super(...arguments);
     this._brightness = new SmoothValue(this);
+    this._warmth = new HeldValue(this);
+    this._hue = new HeldValue(this);
   }
   validateConfig(config) {
     this.expectDomain(config, "light");
@@ -2878,14 +2931,20 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
     const span = this._maxKelvin - this._minKelvin;
     return Math.round(this._maxKelvin - warmth / 100 * span);
   }
-  _currentWarmth(stateObj) {
+  _warmthFromState(stateObj) {
     const k2 = numericState(stateObj.attributes.color_temp_kelvin);
     return k2 === void 0 ? 50 : this._warmthFromKelvin(k2);
   }
-  _currentHue(stateObj) {
+  _currentWarmth(stateObj) {
+    return this._warmth.read(this._warmthFromState(stateObj));
+  }
+  _hueFromState(stateObj) {
     const hs = stateObj.attributes.hs_color;
     if (!Array.isArray(hs) || hs.length < 1) return 0;
     return Math.round(hs[0] / 360 * 100);
+  }
+  _currentHue(stateObj) {
+    return this._hue.read(this._hueFromState(stateObj));
   }
   /**
    * Couleur émise par l'ampoule, pour la lueur et le symbole de l'interrupteur.
@@ -2934,9 +2993,12 @@ let SkeuoLightCard = class extends SkeuoBaseCard {
     this.callService("light", "turn_on", { brightness_pct: cible });
   }
   _setWarmth(warmth) {
+    const stateObj = this.stateObj;
+    if (stateObj) this._warmth.commit(warmth, this._warmthFromState(stateObj));
     this.callService("light", "turn_on", { color_temp_kelvin: this._kelvinFromWarmth(warmth) });
   }
   _setHue(value, stateObj) {
+    this._hue.commit(value, this._hueFromState(stateObj));
     const hs = stateObj.attributes.hs_color;
     const saturation = Array.isArray(hs) && hs.length > 1 ? hs[1] : 100;
     this.callService("light", "turn_on", { hs_color: [value / 100 * 360, saturation] });
@@ -7160,7 +7222,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc2"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.2-rc3"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );

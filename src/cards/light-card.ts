@@ -13,6 +13,7 @@ import { type HassEntity, isActive, isUnavailable, numericState } from "../core/
 import { domainRequired, t, tHa } from "../core/localize";
 import { baseSchema, computeHelper, computeLabel, registerCard } from "../core/register";
 import { formatFixed } from "../core/format";
+import { HeldValue } from "../core/held";
 import { SmoothValue } from "../core/smooth";
 
 import "../components/screen";
@@ -89,6 +90,14 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
    * défaut du contrôleur conviennent tels quels.
    */
   private _brightness = new SmoothValue(this);
+
+  /**
+   * Les deux faders ne sont pas lissés : on ne veut pas qu'un curseur que
+   * l'utilisateur vient de poser reparte tout seul. Ils ont en revanche le
+   * même besoin de tenir leur valeur le temps que la lampe confirme.
+   */
+  private _warmth = new HeldValue(this);
+  private _hue = new HeldValue(this);
 
   protected override validateConfig(config: LightCardConfig): void {
     this.expectDomain(config, "light");
@@ -215,15 +224,23 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
     return Math.round(this._maxKelvin - (warmth / 100) * span);
   }
 
-  private _currentWarmth(stateObj: HassEntity): number {
+  private _warmthFromState(stateObj: HassEntity): number {
     const k = numericState(stateObj.attributes.color_temp_kelvin);
     return k === undefined ? 50 : this._warmthFromKelvin(k);
   }
 
-  private _currentHue(stateObj: HassEntity): number {
+  private _currentWarmth(stateObj: HassEntity): number {
+    return this._warmth.read(this._warmthFromState(stateObj));
+  }
+
+  private _hueFromState(stateObj: HassEntity): number {
     const hs = stateObj.attributes.hs_color;
     if (!Array.isArray(hs) || hs.length < 1) return 0;
     return Math.round(((hs[0] as number) / 360) * 100);
+  }
+
+  private _currentHue(stateObj: HassEntity): number {
+    return this._hue.read(this._hueFromState(stateObj));
   }
 
   /**
@@ -277,10 +294,13 @@ export class SkeuoLightCard extends SkeuoBaseCard<LightCardConfig> {
   }
 
   private _setWarmth(warmth: number): void {
+    const stateObj = this.stateObj;
+    if (stateObj) this._warmth.commit(warmth, this._warmthFromState(stateObj));
     this.callService("light", "turn_on", { color_temp_kelvin: this._kelvinFromWarmth(warmth) });
   }
 
   private _setHue(value: number, stateObj: HassEntity): void {
+    this._hue.commit(value, this._hueFromState(stateObj));
     const hs = stateObj.attributes.hs_color;
     const saturation = Array.isArray(hs) && hs.length > 1 ? (hs[1] as number) : 100;
     this.callService("light", "turn_on", { hs_color: [(value / 100) * 360, saturation] });

@@ -25,6 +25,10 @@ const etats = {
   "light.salon": { entity_id: "light.salon", state: "on", ...socle, attributes: {
     friendly_name: "Plafonnier", brightness: 128, supported_color_modes: ["color_temp"],
     min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500, color_temp_kelvin: 3200 } },
+  "light.couleur": { entity_id: "light.couleur", state: "on", ...socle, attributes: {
+    friendly_name: "Bandeau", brightness: 200, supported_color_modes: ["color_temp", "hs"],
+    color_mode: "hs", min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500,
+    color_temp_kelvin: 3200, hs_color: [36, 80], rgb_color: [255, 190, 105] } },
   "cover.salon": { entity_id: "cover.salon", state: "open", ...socle, attributes: {
     friendly_name: "Store", current_position: 40, supported_features: 15 } },
   "fan.bureau": { entity_id: "fan.bureau", state: "on", ...socle, attributes: {
@@ -151,6 +155,24 @@ rapport.push(await eprouver({
   geste: (el) => { const s = el.stateObj; el._nudge(s, 1); el._nudge(s, 1); el._nudge(s, 1); },
   lire: (el) => el._setpoint.value, attendu: 20.5,
   apres: { temperature: 20.5 },
+}));
+
+// Les deux faders de la carte lumière ne sont pas lissés, mais ils doivent
+// tenir leur position de la même façon.
+rapport.push(await eprouver({
+  carte: "skeuo-light-card", entite: "light.couleur",
+  geste: (el) => el._setWarmth(80),
+  lire: (el) => el.shadowRoot.querySelector('skeuo-fader[gradient="warmth"]').value,
+  attendu: 80,
+  apres: { color_temp_kelvin: 2900 },
+}));
+
+rapport.push(await eprouver({
+  carte: "skeuo-light-card", entite: "light.couleur",
+  geste: (el) => el._setHue(30, el.stateObj),
+  lire: (el) => el.shadowRoot.querySelector('skeuo-fader[gradient="hue"]').value,
+  attendu: 30,
+  apres: { hs_color: [108, 80] },
 }));
 
 // L'appareil borne la demande : la carte doit suivre ce qu'il annonce, pas

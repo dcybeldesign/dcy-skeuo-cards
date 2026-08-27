@@ -15,6 +15,10 @@
   previous value and travels the same path again once the device confirms.
   The card holds the value you set until the entity actually moves, or until
   the command has clearly been lost.
+- The warmth and colour faders on the light card hold their position too.
+  They read the entity on every render and had no local value of their own, so
+  the cap dropped back to where it was until the bulb answered. They are not
+  smoothed: a fader the user has just placed should not glide on its own.
 - The thermostat setpoint now reacts on press instead of on reply, and
   repeated presses accumulate. Three taps on plus used to compute the same
   single step three times while the thermostat had yet to answer, so the
