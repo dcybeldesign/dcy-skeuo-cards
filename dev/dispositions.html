@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Dispositions</title>
+<style>
+  html, body { margin: 0; background: #111214; font-family: Roboto, system-ui, sans-serif; color: #ddd; }
+  h2 { font-size: 14px; font-weight: 500; margin: 24px 0 8px; color: #9aa; }
+  .wrap { padding: 20px; }
+  /* Vue Masonry : la colonne fixe la largeur, la carte décide de sa hauteur. */
+  .masonry { width: 492px; }
+  .masonry-etroit { width: 300px; }
+  /* Vue Sections : la cellule impose les deux dimensions. */
+  .sections { width: 492px; height: 248px; }
+  .sections > * { height: 100%; }
+  pre { background: #0b0c0d; padding: 12px; font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>Masonry 492 (hauteur libre)</h2>
+  <div class="masonry" id="masonry"></div>
+  <h2>Masonry 300 (hauteur libre, sous la largeur nominale)</h2>
+  <div class="masonry-etroit" id="etroit"></div>
+  <h2>Sections 492 x 248 (hauteur imposée)</h2>
+  <div class="sections" id="sections"></div>
+  <pre id="rapport">mesure en cours</pre>
+</div>
+<script type="module">
+await import(`../dist/skeuo-cards.js?t=${Date.now()}`);
+
+const socle = { last_changed: "", last_updated: "", context: {} };
+const states = {
+  "light.salon": { entity_id: "light.salon", state: "on", ...socle, attributes: {
+    friendly_name: "Plafonnier", brightness: 178, supported_color_modes: ["color_temp", "hs"],
+    min_color_temp_kelvin: 2000, max_color_temp_kelvin: 6500,
+    color_temp_kelvin: 3200, hs_color: [38, 62], rgb_color: [255, 190, 105] } },
+  "sensor.humidite": { entity_id: "sensor.humidite", state: "58", ...socle, attributes: {
+    friendly_name: "Humidité", device_class: "humidity", unit_of_measurement: "%" } },
+  "cover.salon": { entity_id: "cover.salon", state: "open", ...socle, attributes: {
+    friendly_name: "Store", current_position: 65, supported_features: 15 } },
+};
+
+const hass = {
+  states, themes: { darkMode: true }, locale: { language: "fr" }, language: "fr", connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C" } },
+  localize: () => "",
+  formatEntityState: (s) => s.attributes.unit_of_measurement
+    ? `${s.state}${s.attributes.unit_of_measurement}` : s.state,
+  callService: () => Promise.resolve(),
+};
+
+const CARTES = [
+  ["skeuo-light-card", { entity: "light.salon" }],
+  ["skeuo-sensor-card", { entity: "sensor.humidite" }],
+  ["skeuo-cover-card", { entity: "cover.salon" }],
+];
+
+for (const conteneur of ["masonry", "etroit", "sections"]) {
+  const hote = document.getElementById(conteneur);
+  for (const [type, config] of CARTES) {
+    const el = document.createElement(type);
+    el.setConfig({ type: `custom:${type}`, ...config });
+    el.hass = hass;
+    hote.appendChild(el);
+  }
+}
+
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+await attendre(400);
+
+// Le facteur appliqué se lit sur le DOM, pas sur le contrôleur : c'est
+// justement l'écart entre les deux qui constituait le défaut.
+const mesurer = (el) => {
+  const stage = el.shadowRoot.querySelector(".stage");
+  const m = new DOMMatrixReadOnly(getComputedStyle(stage).transform);
+  const hote = el.getBoundingClientRect();
+  const plan = stage.getBoundingClientRect();
+  return {
+    carte: el.tagName.toLowerCase().replace("skeuo-", "").replace("-card", ""),
+    hote: `${Math.round(hote.width)}x${Math.round(hote.height)}`,
+    ratio: +(hote.width / hote.height).toFixed(3),
+    facteurDOM: +m.a.toFixed(4),
+    facteurControleur: +el._scaler.scale.toFixed(4),
+    planLargeur: el._scaler.stageWidth,
+    debord: {
+      gauche: +(hote.left - plan.left).toFixed(1),
+      droite: +(plan.right - hote.right).toFixed(1),
+      haut: +(hote.top - plan.top).toFixed(1),
+      bas: +(plan.bottom - hote.bottom).toFixed(1),
+    },
+  };
+};
+
+const rapport = {};
+for (const conteneur of ["masonry", "etroit", "sections"]) {
+  rapport[conteneur] = [...document.getElementById(conteneur).children].map(mesurer);
+}
+
+// Redimensionnement après le premier rendu : c'est le cas que le filtre de
+// rendu avalait, la carte gardait son ancien facteur.
+document.getElementById("masonry").style.width = "700px";
+await attendre(400);
+rapport.apresRedimensionnement = [...document.getElementById("masonry").children].map(mesurer);
+
+document.getElementById("rapport").textContent = JSON.stringify(rapport, null, 1);
+window.rapport = rapport;
+</script>
+</body>
+</html>

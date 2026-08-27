@@ -1,5 +1,7 @@
 import { css, unsafeCSS } from "lit";
 
+import { DESIGN } from "../core/scaler";
+
 /**
  * Chrome commun à toutes les cartes : matière, vis d'angle, titre, plan de
  * référence mis à l'échelle.
@@ -49,6 +51,13 @@ export const chromeStyles = css`
       Consolas, monospace;
 
     font-family: var(--skeuo-font-display);
+
+    /* Les vues Sections imposent une hauteur à la cellule et le ratio est alors
+       ignoré, comme le veut la spec. Les vues Masonry, elles, laissent la carte
+       décider : sans ce ratio, la hauteur retombe sur le min-height du module
+       et le plan se retrouve écrasé dans une bande de 96 px. */
+    display: block;
+    aspect-ratio: ${unsafeCSS(DESIGN.width)} / ${unsafeCSS(DESIGN.height)};
   }
 
   .module {

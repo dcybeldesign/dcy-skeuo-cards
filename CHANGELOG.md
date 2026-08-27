@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.1
+- Fixed the card height in Masonry views. Size was declared through
+  `getGridOptions()` alone, which Sections views honour and Masonry views
+  ignore. The card fell back to the 96 px minimum height of its module and
+  the reference plane ended up squeezed into a strip. The host now carries
+  the aspect ratio of the plane, which Masonry applies and Sections
+  overrides with its own cell height.
+- Fixed the scale factor never reaching the DOM after the first render. The
+  scale controller requested a render without naming a property, and the
+  render filter reads the changed properties to decide, so the request was
+  indistinguishable from a render with no cause and got dropped. Any resize
+  after the first paint kept the previous factor: a card resized in place, a
+  sidebar being collapsed, a tablet rotating.
+
 ## 1.0.0
 - First complete release. The fourteen cards of the project are ported to
   real installable code: light, climate, cover, sensor, smart plug, lock,

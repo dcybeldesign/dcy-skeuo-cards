@@ -1,6 +1,6 @@
 {
   "name": "skeuo-cards",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Skeuomorphic Lovelace cards for Home Assistant",
   "type": "module",
   "license": "MIT",

@@ -23,6 +23,9 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
 /** Plan de référence commun à toutes les cartes du pack. */
 export const DESIGN = { width: 615, height: 310 } as const;
 
+/** Clé portée par la demande de rendu quand le facteur change. */
+export const SCALE_PROPERTY = "skeuoScale";
+
 /** Au-delà, les éléments s'éloigneraient trop les uns des autres. */
 const MAX_STAGE_WIDTH = 1000;
 
@@ -30,8 +33,19 @@ const MAX_STAGE_WIDTH = 1000;
 const GRID_ROW_HEIGHT = 56;
 const GRID_ROW_GAP = 8;
 
+/**
+ * ReactiveControllerHost ne déclare qu'un requestUpdate() sans argument, alors
+ * que LitElement accepte le nom de la propriété à l'origine de la demande.
+ * C'est ce nom qui permet aux cartes de distinguer un changement d'échelle
+ * d'un rendu sans cause, on l'expose donc explicitement.
+ */
+type ScaleHost = ReactiveControllerHost &
+  HTMLElement & {
+    requestUpdate(name?: PropertyKey, oldValue?: unknown): void;
+  };
+
 export class ScaleController implements ReactiveController {
-  private _host: ReactiveControllerHost & HTMLElement;
+  private _host: ScaleHost;
   private _observer?: ResizeObserver;
   private _frame?: number;
 
@@ -40,7 +54,7 @@ export class ScaleController implements ReactiveController {
   /** Largeur du plan en unités de design, variable selon la cellule. */
   public stageWidth: number = DESIGN.width;
 
-  constructor(host: ReactiveControllerHost & HTMLElement) {
+  constructor(host: ScaleHost) {
     this._host = host;
     host.addController(this);
   }
@@ -96,7 +110,11 @@ export class ScaleController implements ReactiveController {
 
     this.scale = scale;
     this.stageWidth = stageWidth;
-    this._host.requestUpdate();
+    // La clé est indispensable : les cartes filtrent les rendus inutiles sur le
+    // contenu de changedProperties, et un requestUpdate() sans argument arrive
+    // avec une map vide, donc indistinguable d'un rendu sans raison. En nommant
+    // la demande, le filtre la laisse passer et le facteur atteint le DOM.
+    this._host.requestUpdate(SCALE_PROPERTY, scale);
   }
 }
 

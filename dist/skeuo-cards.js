@@ -981,6 +981,7 @@ const formatState = (hass, stateObj) => {
 const domainRequired = (domain, hass) => isFrench(hass) ? `\`entity\` doit être une entité du domaine \`${domain}\`.` : `\`entity\` must be an entity from the \`${domain}\` domain.`;
 const wrongDomain = (entityId, domains, hass) => isFrench(hass) ? `\`${entityId}\` n'est pas utilisable ici (domaines acceptés : ${domains.join(", ")})` : `\`${entityId}\` cannot be used here (accepted domains: ${domains.join(", ")})`;
 const DESIGN = { width: 615, height: 310 };
+const SCALE_PROPERTY = "skeuoScale";
 const MAX_STAGE_WIDTH = 1e3;
 const GRID_ROW_HEIGHT = 56;
 const GRID_ROW_GAP = 8;
@@ -1034,7 +1035,7 @@ class ScaleController {
     }
     this.scale = scale;
     this.stageWidth = stageWidth;
-    this._host.requestUpdate();
+    this._host.requestUpdate(SCALE_PROPERTY, scale);
   }
 }
 const rowsForColumns = (columns, sectionWidth = 492) => {
@@ -1077,6 +1078,13 @@ const chromeStyles = i$5`
       Consolas, monospace;
 
     font-family: var(--skeuo-font-display);
+
+    /* Les vues Sections imposent une hauteur à la cellule et le ratio est alors
+       ignoré, comme le veut la spec. Les vues Masonry, elles, laissent la carte
+       décider : sans ce ratio, la hauteur retombe sur le min-height du module
+       et le plan se retrouve écrasé dans une bande de 96 px. */
+    display: block;
+    aspect-ratio: ${r$4(DESIGN.width)} / ${r$4(DESIGN.height)};
   }
 
   .module {
@@ -7068,7 +7076,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.0"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.1"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );
