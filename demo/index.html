@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skeuo Cards, live demo</title>
+<meta name="description" content="Live, interactive demo of two Skeuo Cards for Home Assistant. Nothing is connected: the entities are simulated in the page.">
+<style>
+  :root {
+    --bg: #141416;
+    --panel: #1c1d20;
+    --line: #2c2e33;
+    --ink: #d8d9dd;
+    --ink-dim: #8b8d94;
+    --amber: #e2a659;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 22px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  header { margin-bottom: 26px; }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: .01em;
+  }
+  h1 span { color: var(--amber); }
+  .lede { margin: 0; max-width: 62ch; color: var(--ink-dim); }
+  .lede a { color: var(--amber); }
+
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    margin: 20px 0 24px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .fld { display: flex; align-items: center; gap: 8px; }
+  .fld > label { color: var(--ink-dim); font-size: 13px; white-space: nowrap; }
+  select, input[type="color"] {
+    background: #26282c; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 7px; font: inherit; font-size: 13px;
+  }
+  input[type="color"] { padding: 2px; width: 38px; height: 28px; cursor: pointer; }
+  input[type="range"] { width: 116px; accent-color: var(--amber); cursor: pointer; }
+  input[type="checkbox"] { accent-color: var(--amber); width: 15px; height: 15px; cursor: pointer; }
+  .val { color: var(--amber); font-variant-numeric: tabular-nums; font-size: 13px; min-width: 44px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    background: #26282c; color: var(--ink-dim); border: 0;
+    padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--amber); color: #1a1206; font-weight: 600; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; }
+  .slot { display: flex; flex-direction: column; gap: 9px; }
+  /* Repère de cellule en outline et non en border : une bordure mangerait 2 px
+     sur la largeur utile et les hauteurs affichées ne tomberaient plus sur
+     celles d'un vrai dashboard. */
+  .cell { outline: 1px dashed #35373d; border-radius: 4px; }
+  /* Les deux dispositions de Home Assistant, reproduites telles quelles.
+     Sections impose une hauteur à la cellule et étire la carte dedans, ce qui
+     neutralise l'aspect-ratio que la carte porte elle-même. Masonry ne donne
+     qu'une largeur de colonne et laisse ce ratio décider de la hauteur. */
+  .cell > * { display: block; width: 100%; }
+  .cell.sections > * { height: 100%; }
+  .cell.masonry { height: auto !important; }
+  .cell.masonry > * { height: auto; }
+  .cap { color: var(--ink-dim); font-size: 13px; display: flex; gap: 10px; align-items: baseline; }
+  .cap b { color: var(--ink); font-weight: 600; }
+  .cnt { color: var(--amber); font-variant-numeric: tabular-nums; }
+
+  .notes { margin-top: 34px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .note { padding: 15px 17px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .note h2 { margin: 0 0 7px; font-size: 14px; font-weight: 650; color: var(--amber); }
+  .note p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+  .note code {
+    background: #26282c; color: var(--ink);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+  }
+
+  footer { margin-top: 34px; color: var(--ink-dim); font-size: 14px; }
+  footer a { color: var(--amber); }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1><span>Skeuo Cards</span> <em data-t="title"></em></h1>
+  <p class="lede" data-t="lede"></p>
+</header>
+
+<div class="bar">
+  <div class="fld">
+    <label data-t="lang"></label>
+    <div class="seg" id="lang">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="fr" aria-pressed="false">FR</button>
+    </div>
+  </div>
+
+  <div class="fld">
+    <label data-t="layout"></label>
+    <div class="seg" id="layout">
+      <button type="button" data-layout="masonry" aria-pressed="true" data-t="masonry"></button>
+      <button type="button" data-layout="sections" aria-pressed="false" data-t="sections"></button>
+    </div>
+  </div>
+
+  <div class="fld">
+    <label for="material" data-t="material"></label>
+    <select id="material">
+      <option value="carbon">carbon</option>
+      <option value="graphite">graphite</option>
+      <option value="brushed">brushed metal</option>
+    </select>
+  </div>
+
+  <div class="fld">
+    <label for="texture" data-t="grain"></label>
+    <input id="texture" type="range" min="0" max="150" step="5" value="60">
+    <span class="val" id="textureVal">60 %</span>
+  </div>
+
+  <div class="fld">
+    <label for="accent" data-t="accent"></label>
+    <input id="accent" type="color" value="#e2a659">
+  </div>
+
+  <div class="fld">
+    <label for="screws" data-t="screws"></label>
+    <input id="screws" type="checkbox" checked>
+  </div>
+
+  <div class="fld">
+    <label for="watts" data-t="watts"></label>
+    <input id="watts" type="range" min="0" max="3000" step="10" value="420">
+    <span class="val" id="wattsVal">420 W</span>
+  </div>
+
+  <div class="fld">
+    <label for="w" data-t="width"></label>
+    <input id="w" type="range" min="300" max="900" step="4" value="492">
+    <span class="val" id="wVal">492</span>
+  </div>
+
+  <div class="fld" id="hFld">
+    <label for="h" data-t="height"></label>
+    <input id="h" type="range" min="2" max="7" step="1" value="4">
+    <span class="val" id="hVal">4 · 248 px</span>
+  </div>
+
+  <div class="fld" id="dFld">
+    <label data-t="derived"></label>
+    <span class="val" id="dVal">248 px</span>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="notes">
+  <div class="note">
+    <h2 data-t="n1h"></h2>
+    <p data-t="n1p"></p>
+  </div>
+  <div class="note">
+    <h2 data-t="n2h"></h2>
+    <p data-t="n2p"></p>
+  </div>
+  <div class="note">
+    <h2 data-t="n3h"></h2>
+    <p data-t="n3p"></p>
+  </div>
+</div>
+
+<footer>
+  <p data-t="foot"></p>
+</footer>
+
+</div>
+
+<script type="module">
+// Le bundle publié lui-même, pas une copie : la démo montre donc exactement
+// la version que HACS installe. Suppose que GitHub Pages sert la racine du
+// dépôt, pour que dist/ reste accessible depuis demo/.
+//
+// L'échec le plus probable est l'ouverture du fichier par double-clic : sur une
+// origine file:// les navigateurs refusent les imports de module. Sans ce repli
+// le visiteur verrait une grille vide et conclurait que le pack est cassé.
+try {
+  await import("../dist/skeuo-cards.js");
+} catch (err) {
+  // Le script s'arrête ici, les textes de l'en-tête ne seront jamais remplis :
+  // on retire les éléments vides plutôt que de laisser des trous.
+  document.querySelector(".lede").remove();
+  document.querySelector("h1 em").remove();
+  document.querySelector(".bar").remove();
+  document.querySelector(".notes").remove();
+  document.querySelector("footer").remove();
+  document.getElementById("grid").innerHTML = `
+    <div class="note" style="max-width:62ch">
+      <h2>The cards could not load</h2>
+      <p>This page has to be served over HTTP. Opened straight from a
+      <code>file://</code> address it cannot work, because browsers refuse ES module
+      imports from local files. From the repository folder, run
+      <code>python -m http.server 8777</code> and open
+      <code>http://localhost:8777/demo/</code>. Published on GitHub Pages it needs
+      nothing at all.</p>
+      <p style="margin-top:10px">Cette page doit être servie en HTTP. Ouverte directement depuis une
+      adresse <code>file://</code> elle ne peut pas fonctionner, les navigateurs
+      refusant les imports de module depuis un fichier local. Depuis le dossier du
+      dépôt, lancez <code>python -m http.server 8777</code> puis ouvrez
+      <code>http://localhost:8777/demo/</code>.</p>
+    </div>`;
+  throw err;
+}
+
+/* --------------------------------------------------------------- textes UI */
+
+const UI = {
+  en: {
+    title: "live demo",
+    lede: "Two of the fourteen cards, running in this page. Nothing is connected to a Home Assistant: the entities are simulated here, but the cards are the real ones from the pack, unmodified. Drag the volume fader, turn the setpoint dial, press the transport buttons.",
+    lang: "Language", material: "Material", grain: "Grain", accent: "Accent",
+    screws: "Screws", width: "Cell width", height: "Grid rows",
+    layout: "Layout", masonry: "Masonry", sections: "Sections",
+    derived: "Card height", derivedSuffix: "derived",
+    watts: "Meter reading",
+    media: "Media player", climate: "Thermostat", sensor: "Sensor",
+    redraws: "redraws",
+    n_media: "Living room", n_climate: "Bedroom", n_sensor: "Consumption",
+    n1h: "One single scale",
+    n1p: "Home Assistant has two layouts and the cards handle both. In Masonry, the view only hands out a column width and the card decides its own height from its 615 by 310 ratio, so there is nothing to set. In Sections, the view imposes the height instead: a row is 56 px and the gap 8 px, so only 120, 184, 248 and so on exist. Either way the card is drawn once at a reference height and brought down by a uniform factor, so every proportion holds and no text is ever clipped. Widen the cell and the plane stretches to fill rather than leaving two empty bands.",
+    n2h: "Damped motion",
+    n2p: "Drag the meter reading from one end to the other and release. The needle does not jump, it accelerates and settles, because the value itself is interpolated frame by frame rather than the pixels. A device that reports its position in coarse steps still reads as one continuous move. Your own gesture on a fader is never animated, only what comes back from the entity.",
+    n3h: "Redraw filter",
+    n3p: "An unrelated entity is changing state twice a second in the background. The counters under each card do not move, because a card only repaints when one of its own entities, the theme, the language or the connection changes.",
+    foot: 'Everything on this page is drawn in CSS and SVG. No bitmap, no icon set, 59 kB gzipped for the whole pack. Source and installation: <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+  },
+  fr: {
+    title: "démo interactive",
+    lede: "Deux des quatorze cartes, qui tournent dans cette page. Rien n'est relié à un Home Assistant : les entités sont simulées ici, mais les cartes sont bien celles du pack, sans modification. Faites glisser le fader de volume, tournez le bouton de consigne, appuyez sur les touches de transport.",
+    lang: "Langue", material: "Matière", grain: "Grain", accent: "Accent",
+    screws: "Vis", width: "Largeur cellule", height: "Lignes de grille",
+    layout: "Disposition", masonry: "Masonry", sections: "Sections",
+    derived: "Hauteur de carte", derivedSuffix: "déduite",
+    watts: "Valeur mesurée",
+    media: "Lecteur multimédia", climate: "Thermostat", sensor: "Capteur",
+    redraws: "rendus",
+    n_media: "Salon", n_climate: "Chambre", n_sensor: "Consommation",
+    n1h: "Une seule échelle",
+    n1p: "Home Assistant a deux dispositions et les cartes gèrent les deux. En Masonry, la vue ne donne qu'une largeur de colonne et la carte déduit sa hauteur de son ratio de 615 sur 310 : il n'y a rien à régler. En Sections, c'est la vue qui impose la hauteur : une ligne fait 56 px et l'écart 8 px, donc seuls 120, 184, 248 et la suite existent. Dans les deux cas la carte est dessinée une fois à une hauteur de référence puis ramenée par un facteur uniforme, donc toutes les proportions tiennent et aucun texte n'est jamais tronqué. Élargissez la cellule et le plan s'étire pour remplir au lieu de laisser deux bandes vides.",
+    n2h: "Mouvement amorti",
+    n2p: "Faites glisser la valeur mesurée d'un bout à l'autre, puis relâchez. L'aiguille ne saute pas, elle accélère et vient se poser, parce que c'est la valeur elle-même qui est interpolée image par image et pas les pixels. Un appareil qui annonce sa position par paliers grossiers se lit quand même comme un mouvement continu. Votre propre geste sur un fader, lui, n'est jamais animé : seul ce qui revient de l'entité l'est.",
+    n3h: "Filtre de rendu",
+    n3p: "Une entité sans rapport change d'état deux fois par seconde en arrière-plan. Les compteurs sous les cartes ne bougent pas, parce qu'une carte ne se redessine que si l'une de ses propres entités, le thème, la langue ou la connexion a changé.",
+    foot: 'Tout ce que vous voyez est dessiné en CSS et SVG. Aucun bitmap, aucun jeu d\'icônes, 59 ko gzippés pour le pack entier. Source et installation : <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+  },
+};
+
+/* ----------------------------------------------------------- états simulés */
+
+/**
+ * Jaquette d'album, dessinée pour cette page.
+ *
+ * Sur une vraie installation cette image est la pochette réelle servie par
+ * Home Assistant dans entity_picture, et le composant vinyle la pose dans la
+ * pastille centrale. Celle-ci est ronde et fait 42 % du diamètre, donc la
+ * pochette est recadrée en cercle depuis son centre : la composition est
+ * centrée et les angles, qui disparaissent au recadrage, ne portent rien.
+ *
+ * Aucune pochette commerciale ici, ce serait du contenu sous droits sur une
+ * page publique. Ce dessin est original et ne sert que de tenant-lieu.
+ */
+const JAQUETTE = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <linearGradient id="ciel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1b3a"/>
+      <stop offset="0.42" stop-color="#6d2f4a"/>
+      <stop offset="0.72" stop-color="#c96a35"/>
+      <stop offset="1" stop-color="#efb457"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="56%">
+      <stop offset="0" stop-color="#ffe9b0" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#f2a33f" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f2a33f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="600" fill="url(#ciel)"/>
+  <circle cx="300" cy="336" r="230" fill="url(#halo)"/>
+  <circle cx="300" cy="336" r="112" fill="#ffd98a"/>
+
+  <!-- Bandes horizontales sur le disque solaire : le motif est ce qui reste
+       lisible une fois l'image réduite à une cinquantaine de pixels. -->
+  <g fill="#c96a35" opacity="0.75">
+    <rect x="188" y="322" width="224" height="9"/>
+    <rect x="188" y="346" width="224" height="12"/>
+    <rect x="188" y="374" width="224" height="15"/>
+    <rect x="188" y="406" width="224" height="19"/>
+  </g>
+
+  <!-- Ligne d'horizon et relief, en silhouette. -->
+  <rect x="0" y="452" width="600" height="148" fill="#241426"/>
+  <path d="M0 452 L96 396 L168 452 Z" fill="#241426"/>
+  <path d="M212 452 L318 366 L410 452 Z" fill="#2e1a2e"/>
+  <path d="M430 452 L512 404 L600 452 Z" fill="#241426"/>
+</svg>`;
+
+const POCHETTE = `data:image/svg+xml,${encodeURIComponent(JAQUETTE.trim())}`;
+
+const states = {
+  "media_player.salon": {
+    entity_id: "media_player.salon", state: "playing",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Living room",
+      volume_level: 0.62,
+      // Titre et interprète inventés, comme la pochette : la démo ne diffuse
+      // aucun contenu réel.
+      media_title: "Golden Hour",
+      media_artist: "Cap Sirène · Longue Route",
+      entity_picture: POCHETTE,
+      supported_features: 1 | 4 | 16 | 32 | 4096 | 16384,
+    },
+  },
+  "climate.chambre": {
+    entity_id: "climate.chambre", state: "heat",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Bedroom",
+      hvac_modes: ["off", "heat", "cool", "fan_only", "auto"],
+      hvac_action: "heating",
+      current_temperature: 19.4,
+      temperature: 21,
+      min_temp: 7, max_temp: 35, target_temp_step: 0.5,
+    },
+  },
+  "sensor.puissance": {
+    entity_id: "sensor.puissance", state: "420",
+    last_changed: "", last_updated: "", context: {},
+    attributes: {
+      friendly_name: "Consumption",
+      unit_of_measurement: "W",
+      device_class: "power",
+      suggested_display_precision: 0,
+    },
+  },
+  // Entité sans rapport avec les cartes montées, changée deux fois par seconde
+  // pour rendre le filtre de rendu observable.
+  "sensor.bruit_de_fond": {
+    entity_id: "sensor.bruit_de_fond", state: "0",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Background noise", unit_of_measurement: "W" },
+  },
+};
+
+const L10N = {
+  en: {
+    "ui.card.media_player.media_play": "Play",
+    "ui.card.media_player.media_pause": "Pause",
+    "ui.card.media_player.media_stop": "Stop",
+    "ui.card.media_player.media_next_track": "Next track",
+    "ui.card.media_player.media_previous_track": "Previous track",
+    "component.media_player.entity_component._.state.playing": "Playing",
+    "component.media_player.entity_component._.state.paused": "Paused",
+    "component.media_player.entity_component._.state.idle": "Idle",
+    "component.climate.entity_component._.state.heat": "Heat",
+    "component.climate.entity_component._.state.cool": "Cool",
+    "component.climate.entity_component._.state.off": "Off",
+    "component.climate.entity_component._.state.auto": "Auto",
+    "component.climate.entity_component._.state.fan_only": "Fan only",
+    "component.climate.entity_component._.state_attributes.hvac_action.state.heating": "Heating",
+    "component.climate.entity_component._.state_attributes.hvac_action.state.idle": "Idle",
+  },
+  fr: {
+    "ui.card.media_player.media_play": "Lecture",
+    "ui.card.media_player.media_pause": "Pause",
+    "ui.card.media_player.media_stop": "Arrêter",
+    "ui.card.media_player.media_next_track": "Piste suivante",
+    "ui.card.media_player.media_previous_track": "Piste précédente",
+    "component.media_player.entity_component._.state.playing": "En lecture",
+    "component.media_player.entity_component._.state.paused": "En pause",
+    "component.media_player.entity_component._.state.idle": "En veille",
+    "component.climate.entity_component._.state.heat": "Chauffage",
+    "component.climate.entity_component._.state.cool": "Climatisation",
+    "component.climate.entity_component._.state.off": "Arrêt",
+    "component.climate.entity_component._.state.auto": "Auto",
+    "component.climate.entity_component._.state.fan_only": "Ventilation",
+    "component.climate.entity_component._.state_attributes.hvac_action.state.heating": "Chauffe",
+    "component.climate.entity_component._.state_attributes.hvac_action.state.idle": "Au repos",
+  },
+};
+
+let lang = "en";
+
+const hass = {
+  states,
+  themes: { darkMode: true, theme: "default" },
+  locale: { language: "en", number_format: "comma_decimal", time_format: "24" },
+  language: "en",
+  connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C", length: "km", mass: "kg" } },
+  localize: (key) => L10N[lang][key] ?? "",
+  connection: { subscribeMessage: () => Promise.resolve(async () => {}) },
+  formatEntityState: (s) => {
+    const unit = s.attributes.unit_of_measurement;
+    const brut = Number(s.state);
+    if (unit && Number.isFinite(brut)) {
+      return `${new Intl.NumberFormat(lang, { maximumFractionDigits: 2 }).format(brut)} ${unit}`;
+    }
+    if (unit) return `${s.state} ${unit}`;
+    const domain = s.entity_id.split(".")[0];
+    return hass.localize(`component.${domain}.entity_component._.state.${s.state}`) || s.state;
+  },
+  formatEntityAttributeValue: (s, attribut) => {
+    const valeur = Number(s.attributes[attribut]);
+    if (!Number.isFinite(valeur)) return String(s.attributes[attribut] ?? "");
+    const unit = attribut.includes("temp") ? hass.config.unit_system.temperature : (s.attributes.unit_of_measurement ?? "");
+    const nombre = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(valeur);
+    return unit ? `${nombre} ${unit}` : nombre;
+  },
+  callService: (domain, service, data) => {
+    const id = data?.entity_id;
+    const prev = id && states[id];
+    if (!prev) return Promise.resolve();
+    // Home Assistant remplace l'objet d'état, il ne le mute jamais. Le filtre
+    // de rendu des cartes compare des références : muter en place passerait
+    // inaperçu et le compteur de rendus mentirait.
+    const next = { ...prev, attributes: { ...prev.attributes } };
+    if (service === "volume_set") next.attributes.volume_level = data.volume_level;
+    if (service === "volume_mute") next.attributes.is_volume_muted = data.is_volume_muted;
+    if (service === "media_play_pause") next.state = prev.state === "playing" ? "paused" : "playing";
+    if (service === "media_play") next.state = "playing";
+    if (service === "media_pause") next.state = "paused";
+    if (service === "media_stop") next.state = "idle";
+    if (service === "set_temperature") next.attributes.temperature = data.temperature;
+    if (service === "set_hvac_mode") {
+      next.state = data.hvac_mode;
+      next.attributes.hvac_action = data.hvac_mode === "off" ? "off" : "heating";
+    }
+    if (service === "turn_off") { next.state = "off"; next.attributes.hvac_action = "off"; }
+    if (service === "turn_on") { next.state = "heat"; next.attributes.hvac_action = "heating"; }
+    states[id] = next;
+    push();
+    return Promise.resolve();
+  },
+};
+
+/* ------------------------------------------------------------------ montage */
+
+const CARTES = [
+  ["skeuo-media-card", "media", { entity: "media_player.salon" }],
+  ["skeuo-climate-card", "climate", { entity: "climate.chambre" }],
+  ["skeuo-sensor-card", "sensor", { entity: "sensor.puissance" }],
+];
+
+const grid = document.getElementById("grid");
+const mounted = [];
+
+for (const [type, cle, base] of CARTES) {
+  const slot = document.createElement("div");
+  slot.className = "slot";
+
+  const cell = document.createElement("div");
+  cell.className = "cell";
+
+  const el = document.createElement(type);
+  cell.appendChild(el);
+
+  const cap = document.createElement("p");
+  cap.className = "cap";
+  const nom = document.createElement("b");
+  const cnt = document.createElement("span");
+  cnt.className = "cnt";
+  cap.append(nom, cnt);
+
+  slot.append(cell, cap);
+  grid.appendChild(slot);
+
+  // Compteur de rendus : on masque la méthode du prototype par une propriété
+  // propre à l'instance, LitElement appelle this.updated() donc elle passe.
+  let rendus = 0;
+  const parent = Object.getPrototypeOf(el).updated;
+  el.updated = function (changed) {
+    rendus++;
+    cnt.textContent = `${rendus} ${UI[lang].redraws}`;
+    return parent?.call(this, changed);
+  };
+
+  mounted.push({ el, cell, base, cle, nom, cnt, get rendus() { return rendus; } });
+}
+
+/* ---------------------------------------------------------------- réglages */
+
+const $ = (id) => document.getElementById(id);
+const reglages = { material: "carbon", texture: 60, accent: "#e2a659", screws: true };
+
+function appliquerConfig() {
+  for (const c of mounted) {
+    c.el.setConfig({
+      type: `custom:${c.el.localName}`,
+      ...c.base,
+      subtitle: UI[lang][c.cle],
+      material: reglages.material,
+      texture: reglages.texture,
+      accent: reglages.accent,
+      screws: reglages.screws,
+    });
+  }
+}
+
+/**
+ * Hauteur réelle d'une cellule de la vue Sections : la ligne fait 56 px et
+ * l'écart entre lignes 8 px, donc n lignes occupent 64n moins 8. Les valeurs
+ * intermédiaires n'existent pas dans un dashboard, un curseur continu montrerait
+ * des tailles que l'utilisateur ne peut pas obtenir.
+ */
+const GRID_ROW = 56, GRID_GAP = 8;
+const hauteurLignes = (n) => n * (GRID_ROW + GRID_GAP) - GRID_GAP;
+
+let disposition = "masonry";
+
+function appliquerTaille() {
+  const w = Number($("w").value);
+  const lignes = Number($("h").value);
+  const h = hauteurLignes(lignes);
+  const enSections = disposition === "sections";
+
+  $("wVal").textContent = w;
+  $("hVal").textContent = `${lignes} · ${h} px`;
+  $("hFld").classList.toggle("hidden", !enSections);
+  $("dFld").classList.toggle("hidden", enSections);
+
+  for (const c of mounted) {
+    c.cell.classList.toggle("sections", enSections);
+    c.cell.classList.toggle("masonry", !enSections);
+    c.cell.style.width = `${w}px`;
+    c.cell.style.height = enSections ? `${h}px` : "";
+  }
+
+  // En Masonry la hauteur n'est pas choisie, elle sort de l'aspect-ratio que la
+  // carte porte elle-même. On l'affiche mesurée plutôt que calculée, pour
+  // montrer la vraie valeur et pas une prédiction. Lecture synchrone : offsetHeight
+  // force le calcul de mise en page, alors qu'un requestAnimationFrame ne se
+  // déclencherait pas si la page est ouverte dans un onglet d'arrière-plan.
+  if (!enSections) {
+    const px = mounted[0].el.offsetHeight;
+    $("dVal").textContent = `${px} px · ${UI[lang].derivedSuffix}`;
+  }
+}
+
+function appliquerTextes() {
+  const d = UI[lang];
+  for (const n of document.querySelectorAll("[data-t]")) {
+    n.innerHTML = d[n.dataset.t] ?? "";
+  }
+  for (const b of document.querySelectorAll("#lang button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
+  }
+  for (const c of mounted) {
+    c.nom.textContent = d[c.cle];
+    c.cnt.textContent = `${c.rendus} ${d.redraws}`;
+  }
+  document.documentElement.lang = lang;
+}
+
+// Le filtre de rendu des cartes compare les références de themes, locale et
+// config. Home Assistant ne remplace ces objets que lorsqu'ils changent
+// réellement ; en fabriquer un neuf à chaque push ferait repasser les cartes
+// deux fois par seconde et donnerait un compteur faux.
+let locale = { ...hass.locale };
+
+function push() {
+  const suivant = { ...hass, language: lang, locale, states: { ...states } };
+  for (const c of mounted) c.el.hass = suivant;
+}
+
+$("material").addEventListener("change", (e) => { reglages.material = e.target.value; appliquerConfig(); });
+$("texture").addEventListener("input", (e) => {
+  reglages.texture = Number(e.target.value);
+  $("textureVal").textContent = `${e.target.value} %`;
+  appliquerConfig();
+});
+$("accent").addEventListener("input", (e) => { reglages.accent = e.target.value; appliquerConfig(); });
+$("screws").addEventListener("change", (e) => { reglages.screws = e.target.checked; appliquerConfig(); });
+// L'aiguille est amortie : elle se voit sur un saut, pas sur un suivi continu.
+// La valeur n'est donc envoyée qu'au relâchement, le curseur affiche la
+// destination pendant qu'on le déplace.
+$("watts").addEventListener("input", (e) => {
+  $("wattsVal").textContent = `${e.target.value} W`;
+});
+$("watts").addEventListener("change", (e) => {
+  states["sensor.puissance"] = { ...states["sensor.puissance"], state: e.target.value };
+  push();
+});
+
+$("w").addEventListener("input", appliquerTaille);
+$("h").addEventListener("input", appliquerTaille);
+
+$("layout").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.layout === disposition) return;
+  disposition = b.dataset.layout;
+  for (const x of document.querySelectorAll("#layout button")) {
+    x.setAttribute("aria-pressed", String(x.dataset.layout === disposition));
+  }
+  appliquerTaille();
+});
+
+$("lang").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  // Changement réel de langue : le frontend remplace bien l'objet locale ici,
+  // et les cartes doivent repasser. C'est le seul endroit où on le recrée.
+  locale = { ...hass.locale, language: lang };
+  // Home Assistant ne traduit pas les noms d'entité, mais sur une installation
+  // française la pièce s'appellerait « Salon ». On suit la langue pour rester
+  // représentatif de ce que l'utilisateur verrait chez lui.
+  for (const [id, cle] of [["media_player.salon", "n_media"], ["climate.chambre", "n_climate"], ["sensor.puissance", "n_sensor"]]) {
+    states[id] = { ...states[id], attributes: { ...states[id].attributes, friendly_name: UI[lang][cle] } };
+  }
+  appliquerTextes();
+  appliquerConfig();
+  appliquerTaille();
+  push();
+});
+
+/* -------------------------------------------------------------- démarrage */
+
+appliquerTextes();
+appliquerConfig();
+appliquerTaille();
+push();
+
+// Entité sans rapport : deux changements par seconde. Les cartes ne doivent
+// pas se redessiner, c'est tout l'intérêt du compteur affiché sous chacune.
+setInterval(() => {
+  states["sensor.bruit_de_fond"] = {
+    ...states["sensor.bruit_de_fond"],
+    state: String(Math.round(Math.random() * 2000)),
+  };
+  push();
+}, 500);
+</script>
+</body>
+</html>
