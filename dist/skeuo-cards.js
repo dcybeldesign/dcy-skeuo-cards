@@ -7121,11 +7121,17 @@ SkeuoCameraCard.styles = [
         outline-offset: 3px;
       }
 
+      /* contain et non cover : l'écran fait 2,32 pour 1 alors qu'une caméra
+         donne du 16/9 ou du 4/3, donc remplir le cadre rognerait 23 % du champ
+         de vision dans le premier cas et 43 % dans le second, sans que rien ne
+         le signale. Les bandes laissées de part et d'autre montrent le fond de
+         la vitre, ce que fait aussi un moniteur de vidéosurveillance devant une
+         source qui ne remplit pas sa dalle. */
       .frame {
         display: block;
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
       }
 
       .blank {
@@ -7222,7 +7228,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.2"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.0.3"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );

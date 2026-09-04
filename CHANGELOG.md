@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3
+- The camera card no longer crops the picture. Its monitor is 2.32:1 while a
+  camera gives 16:9 or 4:3, and the image was filling the frame, so 23 % of
+  the field of view was lost on a 16:9 camera and 43 % on a 4:3 one. The loss
+  was taken off the top and the bottom, which is where a surveillance view
+  usually carries what matters: the floor in front of a door, and the upper
+  part of the field. The picture is now fitted inside the monitor, and the
+  bands left on either side show the glass behind it, the way a real monitor
+  does with a source that does not fill its panel.
+
 ## 1.0.2
 - Card titles no longer start underneath the top-left screw. The screws were
   drawn at a fixed 16 px while everything else followed the scale factor, so
