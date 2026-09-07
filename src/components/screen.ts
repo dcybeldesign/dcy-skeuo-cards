@@ -60,7 +60,10 @@ export class SkeuoScreen extends LitElement {
       position: relative;
       box-sizing: border-box;
       border-radius: 13.6px;
-      padding: 13.6px 10.2px;
+      /* La marge verticale est exposée pour les cartes qui empilent plusieurs
+         éléments dans la vitre et ont besoin de récupérer cette place. Valeur
+         par défaut inchangée, aucune autre carte n'est affectée. */
+      padding: var(--skeuo-screen-pad-y, 13.6px) 10.2px;
       display: flex;
       flex-direction: column;
       align-items: center;

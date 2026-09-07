@@ -51,12 +51,15 @@ const layout = (count: number, stageWidth: number) => {
     gap,
     column,
     screen,
-    screenHeight: Math.min(112, column * 1.25),
-    icon: screen * 0.46,
-    // La ligne de températures est ce qui sature une colonne étroite en
-    // premier : elle ne se coupe pas, elle rétrécit.
-    tempSize: clamp(column * 0.17, 12, 19),
-    tempGap: clamp(column * 0.08, 5, 9),
+    screenHeight: Math.min(132, column * 1.45),
+    // L'icône cède de la place aux deux températures, qui sont passées dans
+    // l'écran : c'est la donnée qui prime sur le pictogramme, et un soleil de
+    // 36 unités reste parfaitement identifiable.
+    icon: screen * 0.63,
+    // Les températures ne se coupent pas, elles rétrécissent. Le plafond est
+    // plus bas qu'avant parce que deux lignes doivent tenir là où il n'y en
+    // avait qu'une, hors écran.
+    tempSize: clamp(column * 0.15, 11, 17),
   };
 };
 
@@ -234,19 +237,16 @@ export class SkeuoForecastCard extends SkeuoBaseCard<ForecastCardConfig> {
       <div class="day" style=${styleMap({ width: `${geo.column}px` })}>
         <p class="label">${this._dayLabel(item)}</p>
         <skeuo-screen bare .width=${geo.screen} .height=${geo.screenHeight}>
-          <skeuo-weather-icon
-            .condition=${weatherIconName(item.condition ?? "exceptional", this._isNight(item))}
-            .size=${geo.icon}
-            .glow=${false}
-          ></skeuo-weather-icon>
+          <div class="pile" style=${styleMap({ fontSize: `${geo.tempSize}px` })}>
+            <span class="hi">${high !== undefined ? `${trimNumber(high)}${unit}` : "—"}</span>
+            <skeuo-weather-icon
+              .condition=${weatherIconName(item.condition ?? "exceptional", this._isNight(item))}
+              .size=${geo.icon}
+              .glow=${false}
+            ></skeuo-weather-icon>
+            ${low !== undefined ? html`<span class="lo">${trimNumber(low)}${unit}</span>` : nothing}
+          </div>
         </skeuo-screen>
-        <p
-          class="temps"
-          style=${styleMap({ fontSize: `${geo.tempSize}px`, gap: `${geo.tempGap}px` })}
-        >
-          <span class="hi">${high !== undefined ? `${trimNumber(high)}${unit}` : "—"}</span>
-          ${low !== undefined ? html`<span class="lo">${trimNumber(low)}${unit}</span>` : nothing}
-        </p>
       </div>
     `;
   }
@@ -273,21 +273,36 @@ export class SkeuoForecastCard extends SkeuoBaseCard<ForecastCardConfig> {
 
       .label {
         margin: 0;
-        font-size: 14px;
-        line-height: 17px;
+        font-size: 18px;
+        line-height: 21px;
         letter-spacing: 2.1px;
         color: var(--skeuo-label, #85888b);
         text-transform: uppercase;
         white-space: nowrap;
       }
 
-      /* Le maximum en ambre, le minimum en gris : la hiérarchie se lit d'un
-         coup d'œil sans avoir à décoder deux chiffres de même poids. */
-      /* La taille et l'écart sont posés à l'unité près par le rendu, qui est le
-         seul à connaître la largeur de colonne du moment. */
-      .temps {
-        margin: 0;
+/* Les deux températures sont dans l'écran, maximum au-dessus de l'icône et
+         minimum en dessous. Elles étaient posées sur la façade, en petit et sur
+         le grain du carbone, ce qui les rendait presque illisibles à sept jours ;
+         défaut signalé publiquement le 2026-09-07. Le fond noir de la vitre rend
+         le gris du minimum lisible, ce que le carbone ne permettait pas.
+         Le maximum en ambre, le minimum en gris : la hiérarchie se lit d'un coup
+         d'œil sans avoir à décoder deux chiffres de même poids. La taille est
+         posée à l'unité près par le rendu, seul à connaître la largeur de
+         colonne du moment. */
+      /* La vitre resserre sa marge haute et basse : les deux températures se
+         rapprochent des bords et toute la place gagnée va à l'icône, qui est
+         ce qu'on lit de loin. */
+      .day skeuo-screen {
+        --skeuo-screen-pad-y: 6px;
+      }
+
+      .pile {
         display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
         font-family: var(--skeuo-font-lcd);
         line-height: 1.2;
         white-space: nowrap;

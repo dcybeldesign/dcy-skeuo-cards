@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.5
+- The forecast temperatures are readable again. They were printed under each
+  tile, on the textured face of the card, small and with the low in grey, which
+  is the hardest thing to read the pack can produce. They now sit inside the
+  screen, the high above the icon and the low below it, where the black glass
+  gives them the contrast the carbon never could. The tile grew taller to take
+  them, the weather icon grew with it rather than shrinking, and the day names
+  went up from 14 to 18 px. Checked with real forecast data at five and at
+  seven days, which is where the columns get narrow enough to break.
+- The screen component now exposes its vertical padding as a CSS variable. The
+  default is unchanged, so every other card renders exactly as before; only the
+  forecast card asks for a tighter one, to give the height back to the icon.
+
 ## 1.0.4
 - The light card knob no longer carries its lighting around as it turns. The
   highlight and the shadow were painted on the same layer that receives the
