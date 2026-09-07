@@ -57,10 +57,10 @@ export class SkeuoKnob extends LitElement {
         <svg class="ticks" viewBox="0 0 200 200" aria-hidden="true">
           ${this._renderTicks()}
         </svg>
-        <div class="disc" style=${styleMap({ transform: `rotate(${angle}deg)` })}>
+        <div class="disc" style=${styleMap({ "--angle": `${angle}deg` })}>
           <span class="plate"></span>
           <span class="cap"></span>
-          <span class="pointer"></span>
+          <span class="needle"><span class="pointer"></span></span>
         </div>
       </div>
     `;
@@ -199,15 +199,13 @@ export class SkeuoKnob extends LitElement {
       position: absolute;
       inset: 12%;
       border-radius: 50%;
-      background-image:
-        radial-gradient(circle at 33% 26%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 46%),
-        radial-gradient(circle at 74% 80%, rgba(0, 0, 0, 0.52) 0%, rgba(0, 0, 0, 0) 52%),
-        repeating-conic-gradient(
-          from 0deg,
-          rgba(255, 255, 255, 0.14) 0deg 1.5deg,
-          rgba(0, 0, 0, 0.16) 1.5deg 3deg
-        ),
-        radial-gradient(circle at 50% 50%, #8a8a8a 0%, #6f6f6f 62%, #4a4a4a 88%, #333333 100%);
+      background-image: radial-gradient(
+        circle at 50% 50%,
+        #8a8a8a 0%,
+        #6f6f6f 62%,
+        #4a4a4a 88%,
+        #333333 100%
+      );
       box-shadow:
         10px 10px 18px rgba(0, 0, 0, 0.6),
         3px 3px 6px rgba(0, 0, 0, 0.5),
@@ -216,28 +214,91 @@ export class SkeuoKnob extends LitElement {
         inset 0 0 0 1px rgba(0, 0, 0, 0.4);
     }
 
+    /* Seul le moletage tourne : c'est la matière qui bouge sous la lumière, pas
+       la lumière avec la matière. Le reflet et l'ombre sont posés par-dessus sur
+       un calque fixe, ce qui garde la source en haut à gauche quelle que soit la
+       position du bouton, comme l'exige la règle d'éclairage du pack. Défaut
+       signalé publiquement le 2026-09-07, la molette entière tournait. */
+    .disc::before,
+    .disc::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+    }
+    .disc::before {
+      z-index: 0;
+      transform: rotate(var(--angle, 0deg));
+      background-image: repeating-conic-gradient(
+        from 0deg,
+        rgba(255, 255, 255, 0.14) 0deg 1.5deg,
+        rgba(0, 0, 0, 0.16) 1.5deg 3deg
+      );
+    }
+    .disc::after {
+      z-index: 1;
+      background-image:
+        radial-gradient(circle at 33% 26%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 46%),
+        radial-gradient(circle at 74% 80%, rgba(0, 0, 0, 0.52) 0%, rgba(0, 0, 0, 0) 52%);
+    }
+
     /* Plateau supérieur, en retrait de la jupe, brossé beaucoup plus finement. */
     .plate {
       position: absolute;
       inset: 13%;
       border-radius: 50%;
-      background-image:
-        radial-gradient(circle at 35% 27%, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0) 55%),
-        repeating-conic-gradient(
-          from 0.35deg,
-          rgba(255, 255, 255, 0.05) 0deg 0.7deg,
-          rgba(0, 0, 0, 0.05) 0.7deg 1.4deg
-        ),
-        radial-gradient(circle at 50% 50%, #9b9b9b 0%, #838383 68%, #616161 100%);
+      z-index: 2;
+      overflow: hidden;
+      background-image: radial-gradient(
+        circle at 50% 50%,
+        #9b9b9b 0%,
+        #838383 68%,
+        #616161 100%
+      );
       box-shadow:
         inset 1px 1px 2px rgba(0, 0, 0, 0.5),
         inset -1px -1px 2px rgba(255, 255, 255, 0.22);
+    }
+
+    .plate::before,
+    .plate::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+    }
+    .plate::before {
+      z-index: 0;
+      transform: rotate(var(--angle, 0deg));
+      background-image: repeating-conic-gradient(
+        from 0.35deg,
+        rgba(255, 255, 255, 0.05) 0deg 0.7deg,
+        rgba(0, 0, 0, 0.05) 0.7deg 1.4deg
+      );
+    }
+    .plate::after {
+      z-index: 1;
+      background-image: radial-gradient(
+        circle at 35% 27%,
+        rgba(255, 255, 255, 0.26) 0%,
+        rgba(255, 255, 255, 0) 55%
+      );
+    }
+
+    /* L'aiguille est le seul élément solidaire du geste : elle porte le repère
+       et tourne seule, le corps de la molette restant éclairé de la même façon. */
+    .needle {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      transform: rotate(var(--angle, 0deg));
     }
 
     /* Chapeau central : sa seule fonction est de couvrir le point de
        convergence des deux dégradés coniques. */
     .cap {
       position: absolute;
+      z-index: 3;
       inset: 34%;
       border-radius: 50%;
       background-image:

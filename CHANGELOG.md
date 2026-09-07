@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.4
+- The light card knob no longer carries its lighting around as it turns. The
+  highlight and the shadow were painted on the same layer that receives the
+  rotation, so setting a brightness moved the light source with the knob. The
+  body now keeps its lighting whatever the position, and only the knurling and
+  the pointer move, which is what a real machined knob does. Reported on
+  r/homeassistant, and it was a breach of the pack's own rule that the light
+  always comes from the top left.
+
 ## 1.0.3
 - The camera card no longer crops the picture. Its monitor is 2.32:1 while a
   camera gives 16:9 or 4:3, and the image was filling the frame, so 23 % of
