@@ -172,11 +172,13 @@ export const baseSchema = () => [
                   { value: "carbon", label: "Carbone" },
                   { value: "graphite", label: "Graphite" },
                   { value: "brushed", label: "Métal brossé" },
+                  { value: "none", label: "Sans façade" },
                 ]
               : [
                   { value: "carbon", label: "Carbon fibre" },
                   { value: "graphite", label: "Graphite" },
                   { value: "brushed", label: "Brushed metal" },
+                  { value: "none", label: "No fascia" },
                 ],
           },
         },

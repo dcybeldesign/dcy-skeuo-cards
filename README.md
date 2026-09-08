@@ -18,7 +18,7 @@ Four choices shape the pack.
 
 **Uniform scale factor.** The design is drawn at a fixed reference height of 310 px, then brought down to the real cell size by a `transform: scale()` computed from a `ResizeObserver`. Everything, text included, keeps exactly the same proportions at any size: nothing ever gets truncated. The width of the plane, on the other hand, stretches to fill wide sections instead of leaving two empty bands.
 
-**No bitmap images.** Textures, knob, screws, screens and the sixteen weather icons are produced in CSS and SVG, all drawn for this pack, with no external icon set. The bundle is 240 kB (59 kB gzipped), and the rendering stays crisp at any display size, which a photograph could not do.
+**No bitmap images.** Textures, knob, screws, screens and the sixteen weather icons are produced in CSS and SVG, all drawn for this pack, with no external icon set. The bundle is 252 kB (63 kB gzipped), and the rendering stays crisp at any display size, which a photograph could not do.
 
 **Smoothed motion.** No value jumps from one point to another: cover position, thermostat and water heater setpoints, fan speed, player volume, knob brightness and VU meter needles reach their target by accelerating then decelerating. The value itself is interpolated frame by frame, which leaves the native controls in place and absorbs the steps an appliance reports while it is moving. A user gesture is never animated, and `prefers-reduced-motion` removes everything.
 
@@ -276,7 +276,7 @@ The Motion button calls `camera.enable_motion_detection` and its opposite, and s
 
 ![State comparison](docs/etats.png)
 
-An appliance that is off turns to greyscale, fascia included: screens, indicators and colour bands desaturate, but nothing becomes translucent. A transparent card would let the dashboard background show through its own controls, which breaks the sense of material; a grey fascia is still a fascia.
+An appliance that is off turns to greyscale, fascia included: screens, indicators and colour bands desaturate, but nothing becomes translucent. Turning a card translucent to say off would let the dashboard background show through its own controls, which breaks the sense of material; a grey fascia is still a fascia. Removing the fascia on purpose is another matter, and has its own setting below.
 
 An unreachable appliance gets the same desaturation plus a darkening, which pushes it behind the active cards and tells it apart from a simple off state. Here too it is a drop in brightness, not a translucent veil.
 
@@ -289,13 +289,19 @@ States that are not an off state are not greyed out: a closed cover or a sensor 
 | `entity` | required | Driven entity |
 | `name` | `friendly_name` | Module title |
 | `subtitle` | empty | Line under the title |
-| `material` | `carbon` | `carbon`, `graphite` or `brushed` |
+| `material` | `carbon` | `carbon`, `graphite`, `brushed` or `none` |
 | `accent` | `#e2a659` | Colour of the screens and the arcs |
 | `screws` | `true` | Corner screws |
 | `texture` | `60` | Grain density of the material, from 0 to 150 % |
 | `tap_action` | `more-info` | Action on the title bar |
 | `hold_action` | `more-info` | Long press |
 | `double_tap_action` | `more-info` | Double tap |
+
+### No fascia
+
+`material: none` removes the shell entirely: no material, no grain, no relief, no screws. What is left is the controls and the screens, each carrying its own ground, sitting directly on the dashboard. The card then takes the colour of the theme behind it, light or dark.
+
+The grain and the screws have nothing to sit on in this mode and are ignored. Their fields stay in the editor and simply do nothing: a Lovelace config form is a fixed schema, a field cannot appear or disappear with another one's value. Titles are outlined here, the card title and the playing track, so they hold on a light theme where they would otherwise lose the dark face that carried them.
 
 ### Grain density
 

@@ -18,7 +18,7 @@ Quatre choix structurent le pack.
 
 **Mise à l'échelle par facteur uniforme.** Le design est dessiné à une hauteur de référence fixe de 310 px, puis ramené à la taille réelle de la cellule par un `transform: scale()` calculé au `ResizeObserver`. Tout, texte compris, garde exactement les mêmes proportions à n'importe quelle taille : rien ne se tronque jamais. La largeur du plan, elle, s'étire pour remplir les sections larges au lieu de laisser deux bandes vides.
 
-**Aucune image bitmap.** Textures, molette, vis, écrans et les seize icônes météo sont produits en CSS et en SVG, tous dessinés pour ce pack, sans jeu d'icônes extérieur. Le bundle fait 240 ko (59 ko en gzip), et le rendu reste net quelle que soit la taille d'affichage, ce qu'une photo ne permettrait pas.
+**Aucune image bitmap.** Textures, molette, vis, écrans et les seize icônes météo sont produits en CSS et en SVG, tous dessinés pour ce pack, sans jeu d'icônes extérieur. Le bundle fait 252 ko (63 ko en gzip), et le rendu reste net quelle que soit la taille d'affichage, ce qu'une photo ne permettrait pas.
 
 **Mouvement lissé.** Aucune valeur ne saute d'un point à l'autre : position du volet, consigne du thermostat et du chauffe-eau, vitesse du ventilateur, volume du lecteur, intensité de la molette et aiguille des VU-mètres rejoignent leur cible en accélérant puis en ralentissant. La valeur elle-même est interpolée image par image, ce qui laisse les contrôles natifs en place, et absorbe au passage les paliers que remonte un appareil en cours de course. Un geste de l'utilisateur n'est jamais animé, et `prefers-reduced-motion` supprime tout.
 
@@ -276,7 +276,7 @@ Le bouton Détection appelle `camera.enable_motion_detection` et son inverse, et
 
 ![Comparaison des états](docs/etats.png)
 
-Un appareil éteint passe en niveaux de gris, façade comprise : écrans, voyants et bandes colorées se désaturent, mais rien ne devient translucide. Une carte transparente laisserait voir le fond du tableau de bord au travers de ses propres commandes, ce qui casse l'aspect de matière ; une façade grise reste une façade.
+Un appareil éteint passe en niveaux de gris, façade comprise : écrans, voyants et bandes colorées se désaturent, mais rien ne devient translucide. Rendre une carte translucide pour dire éteint laisserait voir le fond du tableau de bord au travers de ses propres commandes, ce qui casse l'aspect de matière ; une façade grise reste une façade. Retirer la façade volontairement est une autre affaire, et a son propre réglage plus bas.
 
 Un appareil injoignable reçoit la même désaturation plus un assombrissement, ce qui le fait reculer derrière les cartes actives et le distingue d'un simple arrêt. Là encore, c'est une baisse de luminosité, pas un voile translucide.
 
@@ -289,13 +289,19 @@ Les états qui ne sont pas un arrêt ne sont pas grisés : un volet fermé ou un
 | `entity` | requis | Entité pilotée |
 | `name` | `friendly_name` | Titre du module |
 | `subtitle` | vide | Ligne sous le titre |
-| `material` | `carbon` | `carbon`, `graphite` ou `brushed` |
+| `material` | `carbon` | `carbon`, `graphite`, `brushed` ou `none` |
 | `accent` | `#e2a659` | Couleur des écrans et des arcs |
 | `screws` | `true` | Vis d'angle |
 | `texture` | `60` | Densité du grain de la matière, de 0 à 150 % |
 | `tap_action` | `more-info` | Action sur le bandeau titre |
 | `hold_action` | `more-info` | Appui long |
 | `double_tap_action` | `more-info` | Double appui |
+
+### Sans façade
+
+`material: none` retire entièrement la coque : plus de matière, plus de grain, plus de relief, plus de vis. Il ne reste que les commandes et les écrans, qui portent chacun leur propre fond, posés directement sur le tableau de bord. La carte prend alors la couleur du thème derrière elle, clair ou sombre.
+
+Le grain et les vis n'ont plus de support dans ce mode et sont ignorés. Leurs champs restent dans l'éditeur et n'ont simplement plus d'effet : un formulaire de configuration Lovelace est un schéma figé, un champ ne peut pas apparaître ou disparaître selon la valeur d'un autre. Les titres sont détourés ici, celui de la carte et celui du morceau en cours, pour tenir sur un thème clair où ils perdraient la face sombre qui les portait.
 
 ### Densité du grain
 

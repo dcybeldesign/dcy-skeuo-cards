@@ -28,13 +28,18 @@ import { t, wrongDomain } from "./localize";
 import { DESIGN, SCREW_INSET, SCREW_SIZE, ScaleController, rowsForColumns } from "./scaler";
 import { chromeStyles } from "../styles/chrome";
 
-export type MaterialName = "carbon" | "graphite" | "brushed";
+export type MaterialName = "carbon" | "graphite" | "brushed" | "none";
 
 export interface SkeuoBaseConfig extends ActionConfigParams {
   type: string;
   entity: string;
   name?: string;
   subtitle?: string;
+  /**
+   * Matière de la façade. `none` la retire entièrement : il ne reste que les
+   * commandes et les écrans, qui portent leur propre fond. Le grain et les vis
+   * n'ont alors plus de support et sont ignorés par le rendu.
+   */
   material?: MaterialName;
   accent?: string;
   screws?: boolean;
@@ -263,7 +268,7 @@ export abstract class SkeuoBaseCard<
           "--skeuo-screw-inset": `${SCREW_INSET * this._scaler.scale}px`,
         })}
       >
-        ${config.screws !== false ? this._renderScrews() : nothing}
+        ${config.screws !== false && config.material !== "none" ? this._renderScrews() : nothing}
         <div
           class="stage"
           style=${styleMap({

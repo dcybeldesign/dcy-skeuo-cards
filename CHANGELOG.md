@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.0
+- New `material: none`, a shell-less variant of the whole pack. The fascia, its
+  grain, its relief and its screws disappear, leaving the controls and the
+  screens on the dashboard background, light or dark. It answers a request made
+  in public, and behind that request four separate remarks that all pointed at
+  the shell rather than at what the cards carry.
+- Titles are outlined in that mode, the card title and the playing track, so
+  they hold on a light theme where they would otherwise lose the dark face that
+  carried them. The outline is eight zero-blur shadows offset by one pixel, not
+  a blurred halo, which smears small capitals.
+- The grain and the screws are ignored when there is no fascia. Their fields
+  stay visible in the editor: a Lovelace config form is a fixed schema, so a
+  field cannot appear or disappear with another one's value.
+
 ## 1.0.5
 - The forecast temperatures are readable again. They were printed under each
   tile, on the textured face of the card, small and with the low in grey, which

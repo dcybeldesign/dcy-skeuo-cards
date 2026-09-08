@@ -1145,6 +1145,31 @@ const chromeStyles = i$5`
       linear-gradient(150deg, #3c4043 0%, #26292b 55%, #171a1c 100%);
   }
 
+  /* Sans façade : la coque, son relief et son grain disparaissent, il ne reste
+     que les commandes et les écrans, qui portent chacun leur propre fond. La
+     carte prend alors la couleur du tableau de bord, clair ou sombre. */
+  .mat-none {
+    background: none;
+    box-shadow: none;
+  }
+  /* Le titre perdait la façade sombre qui le portait, et sur un thème clair il
+     s'effaçait. Il est détouré par huit ombres à flou nul décalées d'un pixel,
+     jamais par une ombre floue, qui bave et salit les petites capitales. Seuls
+     les titres sont visés, titre du morceau en cours compris : les graduations
+     du galvanomètre et les bornes du cadran sont posées sur une face déjà
+     claire, un trait noir autour d'elles les casse au lieu de les servir. */
+  .mat-none .title {
+    text-shadow:
+      1px 0 0 #000,
+      -1px 0 0 #000,
+      0 1px 0 #000,
+      0 -1px 0 #000,
+      1px 1px 0 #000,
+      -1px 1px 0 #000,
+      1px -1px 0 #000,
+      -1px -1px 0 #000;
+  }
+
   /* Appareil éteint ou injoignable : la façade se désature entièrement, écrans
      et voyants compris. Pas d'opacity ni de voile sombre par-dessus : une carte
      translucide laisse voir le fond du tableau de bord au travers et perd son
@@ -1483,7 +1508,7 @@ class SkeuoBaseCard extends i$2 {
       "--skeuo-screw-inset": `${SCREW_INSET * this._scaler.scale}px`
     })}
       >
-        ${config.screws !== false ? this._renderScrews() : A}
+        ${config.screws !== false && config.material !== "none" ? this._renderScrews() : A}
         <div
           class="stage"
           style=${o({
@@ -1667,11 +1692,13 @@ const baseSchema = () => [
             options: isFrench() ? [
               { value: "carbon", label: "Carbone" },
               { value: "graphite", label: "Graphite" },
-              { value: "brushed", label: "Métal brossé" }
+              { value: "brushed", label: "Métal brossé" },
+              { value: "none", label: "Sans façade" }
             ] : [
               { value: "carbon", label: "Carbon fibre" },
               { value: "graphite", label: "Graphite" },
-              { value: "brushed", label: "Brushed metal" }
+              { value: "brushed", label: "Brushed metal" },
+              { value: "none", label: "No fascia" }
             ]
           }
         }
@@ -7307,7 +7334,7 @@ registerCard({
   preview: true
 });
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.0.5"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.1.0"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );
