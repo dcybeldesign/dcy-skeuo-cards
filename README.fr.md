@@ -303,6 +303,10 @@ Les états qui ne sont pas un arrêt ne sont pas grisés : un volet fermé ou un
 
 Le grain et les vis n'ont plus de support dans ce mode et sont ignorés. Leurs champs restent dans l'éditeur et n'ont simplement plus d'effet : un formulaire de configuration Lovelace est un schéma figé, un champ ne peut pas apparaître ou disparaître selon la valeur d'un autre. Les titres sont détourés ici, celui de la carte et celui du morceau en cours, pour tenir sur un thème clair où ils perdraient la face sombre qui les portait.
 
+Les mêmes trois cartes, d'abord dans les trois matières à grain 0, le pack dans son rendu le plus sobre, puis sans façade sur fond sombre et sur fond clair.
+
+![Les trois matières à grain 0, puis la variante sans façade sur les deux fonds](docs/finitions.png)
+
 ### Densité du grain
 
 `texture` règle la finesse de la matière, **de 0 à 150 % par pas de 10**. Le défaut est **60 %** : une mèche de 6 px, assez pour que le croisement en damier se lise sans que le tissage prenne le pas sur les contrôles qu'il porte. À 0 le motif disparaît complètement et il ne reste que la couleur de fond, ce qui est un rendu valable en soi.

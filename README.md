@@ -303,6 +303,10 @@ States that are not an off state are not greyed out: a closed cover or a sensor 
 
 The grain and the screws have nothing to sit on in this mode and are ignored. Their fields stay in the editor and simply do nothing: a Lovelace config form is a fixed schema, a field cannot appear or disappear with another one's value. Titles are outlined here, the card title and the playing track, so they hold on a light theme where they would otherwise lose the dark face that carried them.
 
+The same three cards, first in the three materials at grain 0, which is the pack at its plainest, then without a fascia on a dark and on a light background.
+
+![The three materials at grain 0, then the shell-less variant on both backgrounds](docs/finitions.png)
+
 ### Grain density
 
 `texture` sets the fineness of the material, **from 0 to 150 % in steps of 10**. The default is **60 %**: a 6 px tow, enough for the checkerboard crossing to read without the weave taking over from the controls it carries. At 0 the pattern disappears completely and only the background colour is left, which is a valid look in itself.
