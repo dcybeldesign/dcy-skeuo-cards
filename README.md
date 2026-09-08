@@ -378,6 +378,10 @@ npm run watch
 
 `dev/index.html` is a standalone test bench, with a simulated `hass`, both section widths, and deliberately broken entities (unavailable, not found, no dimmer) to check the degraded renderings. It serves the bundle from `dist/`, so run `npm run build` first.
 
+## How this was built
+
+The design is mine: the look, the proportions, the materials, what each card does and how it reacts. The code was written with Claude, an AI assistant, and so was most of the English on this page, which is not my first language. Every commit carries a `Co-Authored-By` line for it.
+
 ## Disclaimer
 
 This project is shared freely, put together on my own time. I'm not responsible for any problems its use might cause, hardware, software or otherwise. You use, install and adapt it entirely at your own risk. The files are free to use, share and modify. If you reuse or build on this work, a credit back to me is appreciated, but nothing here is provided with any guarantee.

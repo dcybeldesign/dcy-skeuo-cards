@@ -378,6 +378,10 @@ npm run watch
 
 `dev/index.html` est un banc d'essai autonome, avec un `hass` simulé, les deux largeurs de section, et des entités volontairement cassées (indisponible, introuvable, sans variateur) pour vérifier les rendus dégradés. Il sert le bundle depuis `dist/`, donc lancer `npm run build` avant.
 
+## Comment ce projet a été fait
+
+Le design est de moi : l'allure, les proportions, les matières, ce que fait chaque carte et comment elle réagit. Le code a été écrit avec Claude, un assistant IA, et le texte anglais du dépôt aussi, l'anglais n'étant pas ma langue. Chaque commit porte une ligne `Co-Authored-By` à ce titre.
+
 ## Avertissement
 
 Ce projet est partagé librement, monté sur mon temps libre. Je ne suis pas responsable des problèmes que son utilisation pourrait causer, matériels, logiciels ou autres. Vous l'utilisez, l'installez et l'adaptez entièrement à vos risques. Les fichiers sont libres d'usage, de partage et de modification. Si vous réutilisez ce travail ou construisez dessus, un crédit est apprécié, mais rien n'est fourni avec la moindre garantie.
