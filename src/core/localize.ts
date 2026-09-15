@@ -76,6 +76,8 @@ const FR: Dict = {
   live: "Direct",
   paused_preview: "Figé",
   open_stream: "Ouvrir le direct",
+  clock: "Horloge",
+  status_panel: "États",
 };
 
 const EN: Dict = {
@@ -138,6 +140,8 @@ const EN: Dict = {
   live: "Live",
   paused_preview: "Frozen",
   open_stream: "Open live view",
+  clock: "Clock",
+  status_panel: "Status",
 };
 
 export const isFrench = (hass?: HomeAssistant): boolean => {

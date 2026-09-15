@@ -88,6 +88,9 @@ const LABELS_FR: Record<string, string> = {
   record_filename: "Fichier d'enregistrement",
   record_duration: "Durée d'enregistrement",
   energy_entity: "Entité d'énergie",
+  style: "Style de cadran",
+  blink: "Deux-points clignotants",
+  entities: "Entités affichées",
 };
 
 const LABELS_EN: Record<string, string> = {
@@ -114,6 +117,9 @@ const LABELS_EN: Record<string, string> = {
   record_filename: "Recording file",
   record_duration: "Recording length",
   energy_entity: "Energy entity",
+  style: "Dial style",
+  blink: "Blinking colon",
+  entities: "Displayed entities",
 };
 
 const HELPERS_FR: Record<string, string> = {
@@ -127,6 +133,9 @@ const HELPERS_FR: Record<string, string> = {
   days: "De 3 à 7. La carte s'adapte au nombre de jours réellement reçus.",
   refresh: "Intervalle entre deux images. 0 fige l'aperçu.",
   record_filename: "Chemin complet attendu par le service `camera.record`. Sans lui, le bouton reste inerte.",
+  blink: "Le séparateur bat la seconde. À l'arrêt par défaut : sur un écran mural en permanence dans le champ, un clignotement attire l'œil sans rien dire.",
+  style: "Change l'apparence de la carte, pas ce qu'elle affiche.",
+  entities: "L'ordre de la liste est celui de l'affichage. Au-delà de huit, le panneau devient serré.",
 };
 
 const HELPERS_EN: Record<string, string> = {
@@ -140,6 +149,9 @@ const HELPERS_EN: Record<string, string> = {
   days: "From 3 to 7. The card adapts to the number of days actually received.",
   refresh: "Delay between two frames. 0 freezes the preview.",
   record_filename: "Full path expected by the `camera.record` service. Without it the button stays inert.",
+  blink: "The separator beats the second. Off by default: on a wall screen that stays in view, a blink draws the eye without saying anything.",
+  style: "Changes how the card looks, not what it shows.",
+  entities: "The list order is the display order. Beyond eight, the panel gets cramped.",
 };
 
 export const computeLabel = (schema: { name: string }): string | undefined =>
@@ -148,8 +160,15 @@ export const computeLabel = (schema: { name: string }): string | undefined =>
 export const computeHelper = (schema: { name: string }): string | undefined =>
   (isFrench() ? HELPERS_FR : HELPERS_EN)[schema.name];
 
-export const baseSchema = () => [
-  { name: "entity", required: true, selector: { entity: {} } },
+/**
+ * `entity: false` sert aux cartes qui ne suivent aucune entité, l'horloge à ce
+ * jour : le champ disparaît de l'éditeur au lieu d'y rester en obligatoire
+ * impossible à satisfaire. Tout le reste du formulaire est identique.
+ */
+export const baseSchema = (options: { entity?: boolean } = {}) => [
+  ...(options.entity === false
+    ? []
+    : [{ name: "entity", required: true, selector: { entity: {} } }]),
   {
     type: "grid",
     name: "",

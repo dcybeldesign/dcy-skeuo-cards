@@ -20,6 +20,8 @@ import "./cards/weather-card";
 import "./cards/forecast-card";
 import "./cards/media-card";
 import "./cards/camera-card";
+import "./cards/clock-card";
+import "./cards/binary-card";
 
 declare const __CARD_VERSION__: string;
 
@@ -45,3 +47,5 @@ export { SkeuoWeatherCard } from "./cards/weather-card";
 export { SkeuoForecastCard } from "./cards/forecast-card";
 export { SkeuoMediaCard } from "./cards/media-card";
 export { SkeuoCameraCard } from "./cards/camera-card";
+export { SkeuoClockCard } from "./cards/clock-card";
+export { SkeuoBinaryCard } from "./cards/binary-card";

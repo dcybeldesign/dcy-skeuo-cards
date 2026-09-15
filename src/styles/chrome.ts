@@ -58,6 +58,11 @@ export const chromeStyles = css`
        et le plan se retrouve écrasé dans une bande de 96 px. */
     display: block;
     aspect-ratio: ${unsafeCSS(DESIGN.width)} / ${unsafeCSS(DESIGN.height)};
+    /* Une vue panneau fait l'inverse d'une grille : elle impose la hauteur, et
+       le ratio en déduit alors une largeur qui dépasse l'écran, 1218 px dans
+       une boîte de 732. Plafonner la largeur rend la main au facteur d'échelle,
+       qui se cale sur ce qui tient. */
+    max-width: 100%;
   }
 
   .module {

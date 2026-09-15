@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.2.0
+- Two new cards, which brings the pack to sixteen. The clock reads the time
+  from the browser and follows no entity, in five styles: amber LCD, hands,
+  Nixie tubes, split-flap and a word matrix in French or English. The status
+  panel shows a list of two-state entities, doors, windows, motion, lights,
+  locks, people, as a backlit annunciator, indicator lamps or split-flap
+  modules.
+- The clock only redraws when its picture changes. The LCD, Nixie, split-flap
+  and word styles repaint once a minute; only the hands, and the colon when
+  `blink` is on, beat the second. The colon is still by default: on a wall
+  screen that stays in view, a blink draws the eye without saying anything.
+- The status panel takes its tint from the `device_class`. Red is kept for a
+  short list of real alarms, smoke, gas, carbon monoxide, safety, tamper,
+  problem, moisture and heat; everything else takes the amber of the pack, so
+  that an open window and a fire do not look the same. `color` forces the
+  tint per entity, and `invert` lights an indicator on `off` for classes such
+  as `connectivity`, whose worrying state is the loss of the link.
+- A single entity gets a large indicator and gives its name to the card
+  title, as on the other cards; two get medium indicators; from three on, the
+  panel layout takes over and centres its last row. Long entity names wrap on
+  two lines, and the full name stays in the tooltip.
+- Cards no longer overflow in a panel view. A panel view imposes the height,
+  and the aspect ratio then derived a width wider than the screen, with a
+  horizontal scrollbar. The width is now capped at the container, and the
+  scale factor fits what is left.
+- The bundle grows to 316 kB, 78 kB gzipped, from 252 kB and 63 kB.
+
 ## 1.1.0
 - New `material: none`, a shell-less variant of the whole pack. The fascia, its
   grain, its relief and its screws disappear, leaving the controls and the

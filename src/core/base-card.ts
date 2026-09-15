@@ -32,7 +32,13 @@ export type MaterialName = "carbon" | "graphite" | "brushed" | "none";
 
 export interface SkeuoBaseConfig extends ActionConfigParams {
   type: string;
-  entity: string;
+  /**
+   * Facultatif au niveau du type seulement : toutes les cartes qui pilotent un
+   * appareil l'exigent, et `setConfig` refuse une configuration sans elle tant
+   * que `requiresEntity` est vrai, ce qui est le cas par défaut. L'exception
+   * est l'horloge, qui lit l'heure du navigateur et n'a donc rien à suivre.
+   */
+  entity?: string;
   name?: string;
   subtitle?: string;
   /**
@@ -87,13 +93,25 @@ export abstract class SkeuoBaseCard<
   /** Colonnes de grille visées par défaut, redéfini par les cartes larges. */
   protected static gridColumns = 12;
 
+  /**
+   * La carte suit-elle une entité ? Vrai pour tout le pack sauf l'horloge, qui
+   * lit l'heure du navigateur. Le drapeau garde le contrôle de configuration et
+   * le message « entité introuvable » à l'identique partout ailleurs.
+   */
+  protected static requiresEntity = true;
+
+  /** Raccourci typé vers les réglages statiques de la classe concrète. */
+  private get _kind(): typeof SkeuoBaseCard {
+    return this.constructor as typeof SkeuoBaseCard;
+  }
+
   /* -------------------------------------------------------------- config */
 
   public setConfig(config: TConfig): void {
     if (!config) {
       throw new Error(t(this.hass, "no_entity"));
     }
-    if (!config.entity) {
+    if (this._kind.requiresEntity && !config.entity) {
       throw new Error(t(this.hass, "no_entity"));
     }
     this.validateConfig(config);
@@ -117,9 +135,10 @@ export abstract class SkeuoBaseCard<
   }
 
   protected expectDomain(config: TConfig, ...domains: string[]): void {
-    const domain = config.entity.split(".")[0];
+    const entity = config.entity ?? "";
+    const domain = entity.split(".")[0];
     if (!domains.includes(domain)) {
-      throw new Error(wrongDomain(config.entity, domains, this.hass));
+      throw new Error(wrongDomain(entity, domains, this.hass));
     }
   }
 
@@ -176,8 +195,9 @@ export abstract class SkeuoBaseCard<
   }
 
   protected get stateObj(): HassEntity | undefined {
-    if (!this.hass || !this._config?.entity) return undefined;
-    return this.hass.states[this._config.entity];
+    const entity = this._config?.entity;
+    if (!this.hass || !entity) return undefined;
+    return this.hass.states[entity];
   }
 
   protected get accent(): string {
@@ -210,8 +230,9 @@ export abstract class SkeuoBaseCard<
     service: string,
     data: Record<string, unknown> = {}
   ): void {
-    if (this.preview || !this.hass || !this._config?.entity) return;
-    this.hass.callService(domain, service, { entity_id: this._config.entity, ...data });
+    const entity = this._config?.entity;
+    if (this.preview || !this.hass || !entity) return;
+    this.hass.callService(domain, service, { entity_id: entity, ...data });
   }
 
   /* --------------------------------------------------------------- rendu */
@@ -221,19 +242,34 @@ export abstract class SkeuoBaseCard<
 
     if (!this.hass) return this._renderShell(this._renderSkeleton());
 
+    // Une carte sans entité n'a rien à attendre : elle se dessine directement.
+    if (!this._kind.requiresEntity) {
+      return this._renderShell(this.renderContent());
+    }
+
     const stateObj = this.stateObj;
     if (!stateObj) {
       const message =
         this.hass.config?.state !== STATE_NOT_RUNNING
           ? t(this.hass, "entity_not_found")
           : t(this.hass, "starting");
-      return this._renderShell(this._renderNotice(message, this._config.entity));
+      return this._renderShell(this._renderNotice(message, this._config.entity ?? ""));
     }
 
     return this._renderShell(this.renderContent(stateObj), stateObj);
   }
 
-  protected abstract renderContent(stateObj: HassEntity): TemplateResult;
+  /**
+   * L'argument n'est optionnel que pour les cartes sans entité : partout
+   * ailleurs `render` garantit qu'un état existe avant d'appeler cette méthode,
+   * et les cartes le déclarent donc obligatoire de leur côté.
+   */
+  protected abstract renderContent(stateObj?: HassEntity): TemplateResult;
+
+  /** Titre de repli quand aucune entité ne fournit de nom. */
+  protected defaultTitle(): string {
+    return this._config?.entity ?? "";
+  }
 
   /**
    * Chrome commun : matière, vis d'angle, titre, sous-titre, et le plan de
@@ -245,16 +281,21 @@ export abstract class SkeuoBaseCard<
     // c'est le comportement par défaut de Home Assistant, et le seul moyen
     // d'atteindre l'historique et les réglages depuis la carte. On ne le retire
     // que si l'utilisateur a explicitement demandé `none`.
-    const interactive = config.tap_action?.action !== "none";
+    // Sans entité ni action configurée, un appui n'aurait nulle part où aller :
+    // le bandeau reste alors inerte plutôt que de proposer un bouton mort.
+    const interactive =
+      config.tap_action?.action !== "none" && (!!config.entity || !!config.tap_action);
 
-    const title = config.name ?? (stateObj ? computeEntityName(stateObj) : config.entity);
+    const title = config.name ?? (stateObj ? computeEntityName(stateObj) : this.defaultTitle());
 
     return html`
       <div
         class=${classMap({
           module: true,
           [`mat-${config.material ?? "carbon"}`]: true,
-          unavailable: isUnavailable(stateObj),
+          // Une carte sans entité n'a pas d'appareil à déclarer injoignable :
+          // sans cette réserve, l'absence d'état la faisait passer en gris.
+          unavailable: this._kind.requiresEntity && isUnavailable(stateObj),
           off: !!stateObj && !isUnavailable(stateObj) && this.isOff(stateObj),
         })}
         style=${styleMap({

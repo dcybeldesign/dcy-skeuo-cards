@@ -828,7 +828,7 @@ class ActionHandlerDirective extends i$1 {
   }
 }
 const actionHandler = e$1(ActionHandlerDirective);
-const FR = {
+const FR$1 = {
   brightness: "Intensité",
   color_temp: "Teinte",
   color: "Couleur",
@@ -887,9 +887,11 @@ const FR = {
   record: "Enreg.",
   live: "Direct",
   paused_preview: "Figé",
-  open_stream: "Ouvrir le direct"
+  open_stream: "Ouvrir le direct",
+  clock: "Horloge",
+  status_panel: "États"
 };
-const EN = {
+const EN$1 = {
   brightness: "Brightness",
   color_temp: "Warmth",
   color: "Color",
@@ -948,15 +950,17 @@ const EN = {
   record: "Record",
   live: "Live",
   paused_preview: "Frozen",
-  open_stream: "Open live view"
+  open_stream: "Open live view",
+  clock: "Clock",
+  status_panel: "Status"
 };
 const isFrench = (hass) => {
   const lang = hass?.locale?.language ?? hass?.language ?? navigator.language ?? "en";
   return lang.toLowerCase().startsWith("fr");
 };
 const t = (hass, key) => {
-  const dict = isFrench(hass) ? FR : EN;
-  return dict[key] ?? EN[key] ?? key;
+  const dict = isFrench(hass) ? FR$1 : EN$1;
+  return dict[key] ?? EN$1[key] ?? key;
 };
 const tHa = (hass, haKey, fallbackKey) => {
   if (hass?.localize) {
@@ -1087,6 +1091,11 @@ const chromeStyles = i$5`
        et le plan se retrouve écrasé dans une bande de 96 px. */
     display: block;
     aspect-ratio: ${r$4(DESIGN.width)} / ${r$4(DESIGN.height)};
+    /* Une vue panneau fait l'inverse d'une grille : elle impose la hauteur, et
+       le ratio en déduit alors une largeur qui dépasse l'écran, 1218 px dans
+       une boîte de 732. Plafonner la largeur rend la main au facteur d'échelle,
+       qui se cale sur ce qui tient. */
+    max-width: 100%;
   }
 
   .module {
@@ -1354,13 +1363,13 @@ const chromeStyles = i$5`
     }
   }
 `;
-var __defProp$d = Object.defineProperty;
-var __decorateClass$p = (decorators, target, key, kind) => {
+var __defProp$e = Object.defineProperty;
+var __decorateClass$r = (decorators, target, key, kind) => {
   var result = void 0;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(target, key, result) || result;
-  if (result) __defProp$d(target, key, result);
+  if (result) __defProp$e(target, key, result);
   return result;
 };
 const DEFAULT_ACCENT = "#e2a659";
@@ -1374,12 +1383,19 @@ class SkeuoBaseCard extends i$2 {
   static {
     this.gridColumns = 12;
   }
+  static {
+    this.requiresEntity = true;
+  }
+  /** Raccourci typé vers les réglages statiques de la classe concrète. */
+  get _kind() {
+    return this.constructor;
+  }
   /* -------------------------------------------------------------- config */
   setConfig(config) {
     if (!config) {
       throw new Error(t(this.hass, "no_entity"));
     }
-    if (!config.entity) {
+    if (this._kind.requiresEntity && !config.entity) {
       throw new Error(t(this.hass, "no_entity"));
     }
     this.validateConfig(config);
@@ -1399,9 +1415,10 @@ class SkeuoBaseCard extends i$2 {
     return false;
   }
   expectDomain(config, ...domains) {
-    const domain = config.entity.split(".")[0];
+    const entity = config.entity ?? "";
+    const domain = entity.split(".")[0];
     if (!domains.includes(domain)) {
-      throw new Error(wrongDomain(config.entity, domains, this.hass));
+      throw new Error(wrongDomain(entity, domains, this.hass));
     }
   }
   /* ------------------------------------------------------------- sizing */
@@ -1441,8 +1458,9 @@ class SkeuoBaseCard extends i$2 {
     return this._config?.entity ? [this._config.entity] : [];
   }
   get stateObj() {
-    if (!this.hass || !this._config?.entity) return void 0;
-    return this.hass.states[this._config.entity];
+    const entity = this._config?.entity;
+    if (!this.hass || !entity) return void 0;
+    return this.hass.states[entity];
   }
   get accent() {
     return this._config?.accent ?? DEFAULT_ACCENT;
@@ -1467,19 +1485,27 @@ class SkeuoBaseCard extends i$2 {
    * plusieurs fois simultanément et ne doit surtout pas piloter d'appareil.
    */
   callService(domain, service, data = {}) {
-    if (this.preview || !this.hass || !this._config?.entity) return;
-    this.hass.callService(domain, service, { entity_id: this._config.entity, ...data });
+    const entity = this._config?.entity;
+    if (this.preview || !this.hass || !entity) return;
+    this.hass.callService(domain, service, { entity_id: entity, ...data });
   }
   /* --------------------------------------------------------------- rendu */
   render() {
     if (!this._config) return A;
     if (!this.hass) return this._renderShell(this._renderSkeleton());
+    if (!this._kind.requiresEntity) {
+      return this._renderShell(this.renderContent());
+    }
     const stateObj = this.stateObj;
     if (!stateObj) {
       const message = this.hass.config?.state !== STATE_NOT_RUNNING ? t(this.hass, "entity_not_found") : t(this.hass, "starting");
-      return this._renderShell(this._renderNotice(message, this._config.entity));
+      return this._renderShell(this._renderNotice(message, this._config.entity ?? ""));
     }
     return this._renderShell(this.renderContent(stateObj), stateObj);
+  }
+  /** Titre de repli quand aucune entité ne fournit de nom. */
+  defaultTitle() {
+    return this._config?.entity ?? "";
   }
   /**
    * Chrome commun : matière, vis d'angle, titre, sous-titre, et le plan de
@@ -1487,14 +1513,16 @@ class SkeuoBaseCard extends i$2 {
    */
   _renderShell(content, stateObj) {
     const config = this._config;
-    const interactive = config.tap_action?.action !== "none";
-    const title = config.name ?? (stateObj ? computeEntityName(stateObj) : config.entity);
+    const interactive = config.tap_action?.action !== "none" && (!!config.entity || !!config.tap_action);
+    const title = config.name ?? (stateObj ? computeEntityName(stateObj) : this.defaultTitle());
     return b`
       <div
         class=${e({
       module: true,
       [`mat-${config.material ?? "carbon"}`]: true,
-      unavailable: isUnavailable(stateObj),
+      // Une carte sans entité n'a pas d'appareil à déclarer injoignable :
+      // sans cette réserve, l'absence d'état la faisait passer en gris.
+      unavailable: this._kind.requiresEntity && isUnavailable(stateObj),
       off: !!stateObj && !isUnavailable(stateObj) && this.isOff(stateObj)
     })}
         style=${o({
@@ -1569,16 +1597,16 @@ class SkeuoBaseCard extends i$2 {
     ];
   }
 }
-__decorateClass$p([
+__decorateClass$r([
   n$1({ attribute: false })
 ], SkeuoBaseCard.prototype, "hass");
-__decorateClass$p([
+__decorateClass$r([
   n$1({ type: Boolean })
 ], SkeuoBaseCard.prototype, "preview");
-__decorateClass$p([
+__decorateClass$r([
   n$1({ reflect: true, type: String })
 ], SkeuoBaseCard.prototype, "layout");
-__decorateClass$p([
+__decorateClass$r([
   r()
 ], SkeuoBaseCard.prototype, "_config");
 const DOCS = "https://github.com/dcybeldesign/dcy-skeuo-cards";
@@ -1617,7 +1645,10 @@ const LABELS_FR = {
   refresh: "Rafraîchissement",
   record_filename: "Fichier d'enregistrement",
   record_duration: "Durée d'enregistrement",
-  energy_entity: "Entité d'énergie"
+  energy_entity: "Entité d'énergie",
+  style: "Style de cadran",
+  blink: "Deux-points clignotants",
+  entities: "Entités affichées"
 };
 const LABELS_EN = {
   entity: "Entity",
@@ -1642,7 +1673,10 @@ const LABELS_EN = {
   refresh: "Refresh",
   record_filename: "Recording file",
   record_duration: "Recording length",
-  energy_entity: "Energy entity"
+  energy_entity: "Energy entity",
+  style: "Dial style",
+  blink: "Blinking colon",
+  entities: "Displayed entities"
 };
 const HELPERS_FR = {
   accent: "Couleur des écrans et des arcs, en hexadécimal",
@@ -1654,7 +1688,10 @@ const HELPERS_FR = {
   modes: "Vide = les modes que l'entité déclare elle-même",
   days: "De 3 à 7. La carte s'adapte au nombre de jours réellement reçus.",
   refresh: "Intervalle entre deux images. 0 fige l'aperçu.",
-  record_filename: "Chemin complet attendu par le service `camera.record`. Sans lui, le bouton reste inerte."
+  record_filename: "Chemin complet attendu par le service `camera.record`. Sans lui, le bouton reste inerte.",
+  blink: "Le séparateur bat la seconde. À l'arrêt par défaut : sur un écran mural en permanence dans le champ, un clignotement attire l'œil sans rien dire.",
+  style: "Change l'apparence de la carte, pas ce qu'elle affiche.",
+  entities: "L'ordre de la liste est celui de l'affichage. Au-delà de huit, le panneau devient serré."
 };
 const HELPERS_EN = {
   accent: "Colour of the screens and arcs, in hexadecimal",
@@ -1666,12 +1703,15 @@ const HELPERS_EN = {
   modes: "Empty means the modes the entity declares itself",
   days: "From 3 to 7. The card adapts to the number of days actually received.",
   refresh: "Delay between two frames. 0 freezes the preview.",
-  record_filename: "Full path expected by the `camera.record` service. Without it the button stays inert."
+  record_filename: "Full path expected by the `camera.record` service. Without it the button stays inert.",
+  blink: "The separator beats the second. Off by default: on a wall screen that stays in view, a blink draws the eye without saying anything.",
+  style: "Changes how the card looks, not what it shows.",
+  entities: "The list order is the display order. Beyond eight, the panel gets cramped."
 };
 const computeLabel = (schema) => (isFrench() ? LABELS_FR : LABELS_EN)[schema.name];
 const computeHelper = (schema) => (isFrench() ? HELPERS_FR : HELPERS_EN)[schema.name];
-const baseSchema = () => [
-  { name: "entity", required: true, selector: { entity: {} } },
+const baseSchema = (options = {}) => [
+  ...options.entity === false ? [] : [{ name: "entity", required: true, selector: { entity: {} } }],
   {
     type: "grid",
     name: "",
@@ -1953,14 +1993,14 @@ class SmoothValue {
     this._pendingFrom = void 0;
   }
 }
-var __defProp$c = Object.defineProperty;
-var __getOwnPropDesc$o = Object.getOwnPropertyDescriptor;
-var __decorateClass$o = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$o(target, key) : target;
+var __defProp$d = Object.defineProperty;
+var __getOwnPropDesc$q = Object.getOwnPropertyDescriptor;
+var __decorateClass$q = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$q(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$c(target, key, result);
+  if (kind && result) __defProp$d(target, key, result);
   return result;
 };
 let SkeuoScreen = class extends i$2 {
@@ -2061,38 +2101,38 @@ SkeuoScreen.styles = i$5`
       line-height: 1.3;
     }
   `;
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: String })
 ], SkeuoScreen.prototype, "value", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: String })
 ], SkeuoScreen.prototype, "label", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: String })
 ], SkeuoScreen.prototype, "color", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: Number })
 ], SkeuoScreen.prototype, "width", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: Number })
 ], SkeuoScreen.prototype, "height", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: Number, attribute: "value-size" })
 ], SkeuoScreen.prototype, "valueSize", 2);
-__decorateClass$o([
+__decorateClass$q([
   n$1({ type: Boolean })
 ], SkeuoScreen.prototype, "bare", 2);
-SkeuoScreen = __decorateClass$o([
+SkeuoScreen = __decorateClass$q([
   t$2("skeuo-screen")
 ], SkeuoScreen);
-var __defProp$b = Object.defineProperty;
-var __getOwnPropDesc$n = Object.getOwnPropertyDescriptor;
-var __decorateClass$n = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$n(target, key) : target;
+var __defProp$c = Object.defineProperty;
+var __getOwnPropDesc$p = Object.getOwnPropertyDescriptor;
+var __decorateClass$p = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$p(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$b(target, key, result);
+  if (kind && result) __defProp$c(target, key, result);
   return result;
 };
 let SkeuoFader = class extends i$2 {
@@ -2322,47 +2362,47 @@ SkeuoFader.styles = i$5`
       white-space: nowrap;
     }
   `;
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Number })
 ], SkeuoFader.prototype, "value", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Number })
 ], SkeuoFader.prototype, "min", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Number })
 ], SkeuoFader.prototype, "max", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Number })
 ], SkeuoFader.prototype, "step", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: String })
 ], SkeuoFader.prototype, "caption", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: String })
 ], SkeuoFader.prototype, "gradient", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoFader.prototype, "disabled", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoFader.prototype, "inactive", 2);
-__decorateClass$n([
+__decorateClass$p([
   n$1({ type: String, attribute: "aria-label" })
 ], SkeuoFader.prototype, "ariaLabelText", 2);
-__decorateClass$n([
+__decorateClass$p([
   r()
 ], SkeuoFader.prototype, "_dragging", 2);
-SkeuoFader = __decorateClass$n([
+SkeuoFader = __decorateClass$p([
   t$2("skeuo-fader")
 ], SkeuoFader);
-var __defProp$a = Object.defineProperty;
-var __getOwnPropDesc$m = Object.getOwnPropertyDescriptor;
-var __decorateClass$m = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$m(target, key) : target;
+var __defProp$b = Object.defineProperty;
+var __getOwnPropDesc$o = Object.getOwnPropertyDescriptor;
+var __decorateClass$o = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$o(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$a(target, key, result);
+  if (kind && result) __defProp$b(target, key, result);
   return result;
 };
 let SkeuoToggle = class extends i$2 {
@@ -2530,32 +2570,32 @@ SkeuoToggle.styles = i$5`
       white-space: nowrap;
     }
   `;
-__decorateClass$m([
+__decorateClass$o([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoToggle.prototype, "checked", 2);
-__decorateClass$m([
+__decorateClass$o([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoToggle.prototype, "disabled", 2);
-__decorateClass$m([
+__decorateClass$o([
   n$1({ type: String })
 ], SkeuoToggle.prototype, "color", 2);
-__decorateClass$m([
+__decorateClass$o([
   n$1({ type: String })
 ], SkeuoToggle.prototype, "caption", 2);
-__decorateClass$m([
+__decorateClass$o([
   n$1({ type: String })
 ], SkeuoToggle.prototype, "label", 2);
-SkeuoToggle = __decorateClass$m([
+SkeuoToggle = __decorateClass$o([
   t$2("skeuo-toggle")
 ], SkeuoToggle);
-var __defProp$9 = Object.defineProperty;
-var __getOwnPropDesc$l = Object.getOwnPropertyDescriptor;
-var __decorateClass$l = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$l(target, key) : target;
+var __defProp$a = Object.defineProperty;
+var __getOwnPropDesc$n = Object.getOwnPropertyDescriptor;
+var __decorateClass$n = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$n(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$9(target, key, result);
+  if (kind && result) __defProp$a(target, key, result);
   return result;
 };
 const START_ANGLE = -135;
@@ -2857,33 +2897,33 @@ SkeuoKnob.styles = i$5`
         inset 1px 1px 1px rgba(255, 255, 255, 0.35);
     }
   `;
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: Number })
 ], SkeuoKnob.prototype, "value", 2);
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: Number })
 ], SkeuoKnob.prototype, "min", 2);
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: Number })
 ], SkeuoKnob.prototype, "max", 2);
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: Number })
 ], SkeuoKnob.prototype, "size", 2);
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoKnob.prototype, "disabled", 2);
-__decorateClass$l([
+__decorateClass$n([
   n$1({ type: String })
 ], SkeuoKnob.prototype, "label", 2);
-__decorateClass$l([
+__decorateClass$n([
   r()
 ], SkeuoKnob.prototype, "_dragging", 2);
-SkeuoKnob = __decorateClass$l([
+SkeuoKnob = __decorateClass$n([
   t$2("skeuo-knob")
 ], SkeuoKnob);
-var __getOwnPropDesc$k = Object.getOwnPropertyDescriptor;
-var __decorateClass$k = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$k(target, key) : target;
+var __getOwnPropDesc$m = Object.getOwnPropertyDescriptor;
+var __decorateClass$m = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$m(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -3161,7 +3201,7 @@ SkeuoLightCard.styles = [
       }
     `
 ];
-SkeuoLightCard = __decorateClass$k([
+SkeuoLightCard = __decorateClass$m([
   t$2("skeuo-light-card")
 ], SkeuoLightCard);
 registerCard({
@@ -3252,14 +3292,14 @@ const iconRecord = () => box(w`
     <circle fill="none" stroke="currentColor" cx="8" cy="8" r="6" stroke-width="1.3"/>
     <circle cx="8" cy="8" r="3"/>
   `);
-var __defProp$8 = Object.defineProperty;
-var __getOwnPropDesc$j = Object.getOwnPropertyDescriptor;
-var __decorateClass$j = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$j(target, key) : target;
+var __defProp$9 = Object.defineProperty;
+var __getOwnPropDesc$l = Object.getOwnPropertyDescriptor;
+var __decorateClass$l = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$l(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$8(target, key, result);
+  if (kind && result) __defProp$9(target, key, result);
   return result;
 };
 let SkeuoButton = class extends i$2 {
@@ -3464,35 +3504,35 @@ SkeuoButton.styles = i$5`
       text-align: center;
     }
   `;
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoButton.prototype, "active", 2);
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoButton.prototype, "disabled", 2);
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: Boolean })
 ], SkeuoButton.prototype, "primary", 2);
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: String })
 ], SkeuoButton.prototype, "variant", 2);
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: String })
 ], SkeuoButton.prototype, "caption", 2);
-__decorateClass$j([
+__decorateClass$l([
   n$1({ type: String })
 ], SkeuoButton.prototype, "label", 2);
-SkeuoButton = __decorateClass$j([
+SkeuoButton = __decorateClass$l([
   t$2("skeuo-button")
 ], SkeuoButton);
-var __defProp$7 = Object.defineProperty;
-var __getOwnPropDesc$i = Object.getOwnPropertyDescriptor;
-var __decorateClass$i = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$i(target, key) : target;
+var __defProp$8 = Object.defineProperty;
+var __getOwnPropDesc$k = Object.getOwnPropertyDescriptor;
+var __decorateClass$k = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$k(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$7(target, key, result);
+  if (kind && result) __defProp$8(target, key, result);
   return result;
 };
 const START = -135;
@@ -3626,30 +3666,30 @@ SkeuoDial.styles = i$5`
         3.4px 3.4px 6.7px rgba(0, 0, 0, 0.55);
     }
   `;
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: Number })
 ], SkeuoDial.prototype, "value", 2);
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: Number })
 ], SkeuoDial.prototype, "min", 2);
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: Number })
 ], SkeuoDial.prototype, "max", 2);
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: Number })
 ], SkeuoDial.prototype, "size", 2);
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: String })
 ], SkeuoDial.prototype, "color", 2);
-__decorateClass$i([
+__decorateClass$k([
   n$1({ type: Boolean })
 ], SkeuoDial.prototype, "dimmed", 2);
-SkeuoDial = __decorateClass$i([
+SkeuoDial = __decorateClass$k([
   t$2("skeuo-dial")
 ], SkeuoDial);
-var __getOwnPropDesc$h = Object.getOwnPropertyDescriptor;
-var __decorateClass$h = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$h(target, key) : target;
+var __getOwnPropDesc$j = Object.getOwnPropertyDescriptor;
+var __decorateClass$j = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$j(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -3894,7 +3934,7 @@ SkeuoClimateCard.styles = [
       }
     `
 ];
-SkeuoClimateCard = __decorateClass$h([
+SkeuoClimateCard = __decorateClass$j([
   t$2("skeuo-climate-card")
 ], SkeuoClimateCard);
 registerCard({
@@ -3906,9 +3946,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$g = Object.getOwnPropertyDescriptor;
-var __decorateClass$g = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$g(target, key) : target;
+var __getOwnPropDesc$i = Object.getOwnPropertyDescriptor;
+var __decorateClass$i = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$i(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4034,7 +4074,7 @@ SkeuoCoverCard.styles = [
       }
     `
 ];
-SkeuoCoverCard = __decorateClass$g([
+SkeuoCoverCard = __decorateClass$i([
   t$2("skeuo-cover-card")
 ], SkeuoCoverCard);
 registerCard({
@@ -4046,14 +4086,14 @@ registerCard({
   },
   preview: true
 });
-var __defProp$6 = Object.defineProperty;
-var __getOwnPropDesc$f = Object.getOwnPropertyDescriptor;
-var __decorateClass$f = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$f(target, key) : target;
+var __defProp$7 = Object.defineProperty;
+var __getOwnPropDesc$h = Object.getOwnPropertyDescriptor;
+var __decorateClass$h = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$h(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$6(target, key, result);
+  if (kind && result) __defProp$7(target, key, result);
   return result;
 };
 const PIVOT_X = 150;
@@ -4252,39 +4292,39 @@ SkeuoVuMeter.styles = i$5`
       );
     }
   `;
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "value", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "min", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "max", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: String })
 ], SkeuoVuMeter.prototype, "unit", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "warn", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "danger", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "width", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: Number })
 ], SkeuoVuMeter.prototype, "height", 2);
-__decorateClass$f([
+__decorateClass$h([
   n$1({ type: String })
 ], SkeuoVuMeter.prototype, "label", 2);
-SkeuoVuMeter = __decorateClass$f([
+SkeuoVuMeter = __decorateClass$h([
   t$2("skeuo-vu-meter")
 ], SkeuoVuMeter);
-var __getOwnPropDesc$e = Object.getOwnPropertyDescriptor;
-var __decorateClass$e = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$e(target, key) : target;
+var __getOwnPropDesc$g = Object.getOwnPropertyDescriptor;
+var __decorateClass$g = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$g(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4380,7 +4420,7 @@ SkeuoSensorCard.styles = [
       }
     `
 ];
-SkeuoSensorCard = __decorateClass$e([
+SkeuoSensorCard = __decorateClass$g([
   t$2("skeuo-sensor-card")
 ], SkeuoSensorCard);
 registerCard({
@@ -4392,9 +4432,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$d = Object.getOwnPropertyDescriptor;
-var __decorateClass$d = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$d(target, key) : target;
+var __getOwnPropDesc$f = Object.getOwnPropertyDescriptor;
+var __decorateClass$f = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$f(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4507,7 +4547,7 @@ SkeuoSwitchCard.styles = [
       }
     `
 ];
-SkeuoSwitchCard = __decorateClass$d([
+SkeuoSwitchCard = __decorateClass$f([
   t$2("skeuo-switch-card")
 ], SkeuoSwitchCard);
 registerCard({
@@ -4519,9 +4559,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$c = Object.getOwnPropertyDescriptor;
-var __decorateClass$c = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$c(target, key) : target;
+var __getOwnPropDesc$e = Object.getOwnPropertyDescriptor;
+var __decorateClass$e = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$e(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4668,7 +4708,7 @@ SkeuoLockCard.styles = [
       }
     `
 ];
-SkeuoLockCard = __decorateClass$c([
+SkeuoLockCard = __decorateClass$e([
   t$2("skeuo-lock-card")
 ], SkeuoLockCard);
 registerCard({
@@ -4680,9 +4720,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$b = Object.getOwnPropertyDescriptor;
-var __decorateClass$b = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$b(target, key) : target;
+var __getOwnPropDesc$d = Object.getOwnPropertyDescriptor;
+var __decorateClass$d = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$d(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4831,7 +4871,7 @@ SkeuoFanCard.styles = [
       }
     `
 ];
-SkeuoFanCard = __decorateClass$b([
+SkeuoFanCard = __decorateClass$d([
   t$2("skeuo-fan-card")
 ], SkeuoFanCard);
 registerCard({
@@ -4843,9 +4883,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$a = Object.getOwnPropertyDescriptor;
-var __decorateClass$a = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$a(target, key) : target;
+var __getOwnPropDesc$c = Object.getOwnPropertyDescriptor;
+var __decorateClass$c = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$c(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -4998,7 +5038,7 @@ SkeuoWaterHeaterCard.styles = [
       }
     `
 ];
-SkeuoWaterHeaterCard = __decorateClass$a([
+SkeuoWaterHeaterCard = __decorateClass$c([
   t$2("skeuo-water-heater-card")
 ], SkeuoWaterHeaterCard);
 registerCard({
@@ -5010,9 +5050,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$9 = Object.getOwnPropertyDescriptor;
-var __decorateClass$9 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$9(target, key) : target;
+var __getOwnPropDesc$b = Object.getOwnPropertyDescriptor;
+var __decorateClass$b = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$b(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -5120,7 +5160,7 @@ SkeuoVacuumCard.styles = [
       }
     `
 ];
-SkeuoVacuumCard = __decorateClass$9([
+SkeuoVacuumCard = __decorateClass$b([
   t$2("skeuo-vacuum-card")
 ], SkeuoVacuumCard);
 registerCard({
@@ -5132,9 +5172,9 @@ registerCard({
   },
   preview: true
 });
-var __getOwnPropDesc$8 = Object.getOwnPropertyDescriptor;
-var __decorateClass$8 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$8(target, key) : target;
+var __getOwnPropDesc$a = Object.getOwnPropertyDescriptor;
+var __decorateClass$a = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$a(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -5281,7 +5321,7 @@ SkeuoAlarmCard.styles = [
       }
     `
 ];
-SkeuoAlarmCard = __decorateClass$8([
+SkeuoAlarmCard = __decorateClass$a([
   t$2("skeuo-alarm-card")
 ], SkeuoAlarmCard);
 registerCard({
@@ -5320,14 +5360,14 @@ const isNight = (hass, when) => {
   }
   return night;
 };
-var __defProp$5 = Object.defineProperty;
-var __getOwnPropDesc$7 = Object.getOwnPropertyDescriptor;
-var __decorateClass$7 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$7(target, key) : target;
+var __defProp$6 = Object.defineProperty;
+var __getOwnPropDesc$9 = Object.getOwnPropertyDescriptor;
+var __decorateClass$9 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$9(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$5(target, key, result);
+  if (kind && result) __defProp$6(target, key, result);
   return result;
 };
 const weatherIconName = (condition, night) => night && condition === "partlycloudy" ? "partlycloudy-night" : condition;
@@ -5666,24 +5706,24 @@ SkeuoWeatherIcon.styles = i$5`
       }
     }
   `;
-__decorateClass$7([
+__decorateClass$9([
   n$1({ type: String })
 ], SkeuoWeatherIcon.prototype, "condition", 2);
-__decorateClass$7([
+__decorateClass$9([
   n$1({ type: Number })
 ], SkeuoWeatherIcon.prototype, "size", 2);
-__decorateClass$7([
+__decorateClass$9([
   n$1({ type: Boolean })
 ], SkeuoWeatherIcon.prototype, "glow", 2);
-__decorateClass$7([
+__decorateClass$9([
   n$1({ type: String })
 ], SkeuoWeatherIcon.prototype, "label", 2);
-SkeuoWeatherIcon = __decorateClass$7([
+SkeuoWeatherIcon = __decorateClass$9([
   t$2("skeuo-weather-icon")
 ], SkeuoWeatherIcon);
-var __getOwnPropDesc$6 = Object.getOwnPropertyDescriptor;
-var __decorateClass$6 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$6(target, key) : target;
+var __getOwnPropDesc$8 = Object.getOwnPropertyDescriptor;
+var __decorateClass$8 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$8(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -5758,7 +5798,7 @@ SkeuoWeatherCard.styles = [
       }
     `
 ];
-SkeuoWeatherCard = __decorateClass$6([
+SkeuoWeatherCard = __decorateClass$8([
   t$2("skeuo-weather-card")
 ], SkeuoWeatherCard);
 registerCard({
@@ -5878,14 +5918,14 @@ class ForecastController {
     if (unsub) void unsub().catch(() => void 0);
   }
 }
-var __defProp$4 = Object.defineProperty;
-var __getOwnPropDesc$5 = Object.getOwnPropertyDescriptor;
-var __decorateClass$5 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$5(target, key) : target;
+var __defProp$5 = Object.defineProperty;
+var __getOwnPropDesc$7 = Object.getOwnPropertyDescriptor;
+var __decorateClass$7 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$7(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$4(target, key, result);
+  if (kind && result) __defProp$5(target, key, result);
   return result;
 };
 const BODY_PADDING = 22;
@@ -6139,10 +6179,10 @@ SkeuoForecastCard.styles = [
       }
     `
 ];
-__decorateClass$5([
+__decorateClass$7([
   r()
 ], SkeuoForecastCard.prototype, "_forecast", 2);
-SkeuoForecastCard = __decorateClass$5([
+SkeuoForecastCard = __decorateClass$7([
   t$2("skeuo-forecast-card")
 ], SkeuoForecastCard);
 registerCard({
@@ -6154,14 +6194,14 @@ registerCard({
   },
   preview: true
 });
-var __defProp$3 = Object.defineProperty;
-var __getOwnPropDesc$4 = Object.getOwnPropertyDescriptor;
-var __decorateClass$4 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$4(target, key) : target;
+var __defProp$4 = Object.defineProperty;
+var __getOwnPropDesc$6 = Object.getOwnPropertyDescriptor;
+var __decorateClass$6 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$6(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$3(target, key, result);
+  if (kind && result) __defProp$4(target, key, result);
   return result;
 };
 let SkeuoHFader = class extends i$2 {
@@ -6371,50 +6411,50 @@ SkeuoHFader.styles = i$5`
       white-space: nowrap;
     }
   `;
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Number })
 ], SkeuoHFader.prototype, "value", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Number })
 ], SkeuoHFader.prototype, "min", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Number })
 ], SkeuoHFader.prototype, "max", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Number })
 ], SkeuoHFader.prototype, "step", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Number })
 ], SkeuoHFader.prototype, "width", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: String })
 ], SkeuoHFader.prototype, "caption", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: String })
 ], SkeuoHFader.prototype, "gradient", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoHFader.prototype, "disabled", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoHFader.prototype, "inactive", 2);
-__decorateClass$4([
+__decorateClass$6([
   n$1({ type: String, attribute: "aria-label" })
 ], SkeuoHFader.prototype, "ariaLabelText", 2);
-__decorateClass$4([
+__decorateClass$6([
   r()
 ], SkeuoHFader.prototype, "_dragging", 2);
-SkeuoHFader = __decorateClass$4([
+SkeuoHFader = __decorateClass$6([
   t$2("skeuo-hfader")
 ], SkeuoHFader);
-var __defProp$2 = Object.defineProperty;
-var __getOwnPropDesc$3 = Object.getOwnPropertyDescriptor;
-var __decorateClass$3 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$3(target, key) : target;
+var __defProp$3 = Object.defineProperty;
+var __getOwnPropDesc$5 = Object.getOwnPropertyDescriptor;
+var __decorateClass$5 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$5(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$2(target, key, result);
+  if (kind && result) __defProp$3(target, key, result);
   return result;
 };
 let SkeuoLedMeter = class extends i$2 {
@@ -6491,47 +6531,47 @@ SkeuoLedMeter.styles = i$5`
       transition: background 0.12s linear, box-shadow 0.12s linear;
     }
   `;
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "value", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "min", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "max", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "segments", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "warn", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "danger", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "segmentWidth", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "segmentHeight", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: Number })
 ], SkeuoLedMeter.prototype, "gap", 2);
-__decorateClass$3([
+__decorateClass$5([
   n$1({ type: String })
 ], SkeuoLedMeter.prototype, "label", 2);
-SkeuoLedMeter = __decorateClass$3([
+SkeuoLedMeter = __decorateClass$5([
   t$2("skeuo-led-meter")
 ], SkeuoLedMeter);
-var __defProp$1 = Object.defineProperty;
-var __getOwnPropDesc$2 = Object.getOwnPropertyDescriptor;
-var __decorateClass$2 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$2(target, key) : target;
+var __defProp$2 = Object.defineProperty;
+var __getOwnPropDesc$4 = Object.getOwnPropertyDescriptor;
+var __decorateClass$4 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$4(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp$1(target, key, result);
+  if (kind && result) __defProp$2(target, key, result);
   return result;
 };
 let SkeuoVinyl = class extends i$2 {
@@ -6687,27 +6727,27 @@ SkeuoVinyl.styles = i$5`
       }
     }
   `;
-__decorateClass$2([
+__decorateClass$4([
   n$1({ type: Number })
 ], SkeuoVinyl.prototype, "size", 2);
-__decorateClass$2([
+__decorateClass$4([
   n$1({ type: Boolean, reflect: true })
 ], SkeuoVinyl.prototype, "spinning", 2);
-__decorateClass$2([
+__decorateClass$4([
   n$1({ type: String })
 ], SkeuoVinyl.prototype, "art", 2);
-__decorateClass$2([
+__decorateClass$4([
   n$1({ type: String })
 ], SkeuoVinyl.prototype, "badge", 2);
-__decorateClass$2([
+__decorateClass$4([
   n$1({ type: String })
 ], SkeuoVinyl.prototype, "label", 2);
-SkeuoVinyl = __decorateClass$2([
+SkeuoVinyl = __decorateClass$4([
   t$2("skeuo-vinyl")
 ], SkeuoVinyl);
-var __getOwnPropDesc$1 = Object.getOwnPropertyDescriptor;
-var __decorateClass$1 = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$1(target, key) : target;
+var __getOwnPropDesc$3 = Object.getOwnPropertyDescriptor;
+var __decorateClass$3 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$3(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = decorator(result) || result;
@@ -6960,7 +7000,7 @@ SkeuoMediaCard.styles = [
       }
     `
 ];
-SkeuoMediaCard = __decorateClass$1([
+SkeuoMediaCard = __decorateClass$3([
   t$2("skeuo-media-card")
 ], SkeuoMediaCard);
 registerCard({
@@ -6972,14 +7012,14 @@ registerCard({
   },
   preview: true
 });
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __decorateClass = (decorators, target, key, kind) => {
-  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key) : target;
+var __defProp$1 = Object.defineProperty;
+var __getOwnPropDesc$2 = Object.getOwnPropertyDescriptor;
+var __decorateClass$2 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$2(target, key) : target;
   for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
     if (decorator = decorators[i4])
       result = (kind ? decorator(target, key, result) : decorator(result)) || result;
-  if (kind && result) __defProp(target, key, result);
+  if (kind && result) __defProp$1(target, key, result);
   return result;
 };
 const DEFAULT_REFRESH = 10;
@@ -7315,13 +7355,13 @@ SkeuoCameraCard.styles = [
       }
     `
 ];
-__decorateClass([
+__decorateClass$2([
   r()
 ], SkeuoCameraCard.prototype, "_frame", 2);
-__decorateClass([
+__decorateClass$2([
   r()
 ], SkeuoCameraCard.prototype, "_live", 2);
-SkeuoCameraCard = __decorateClass([
+SkeuoCameraCard = __decorateClass$2([
   t$2("skeuo-camera-card")
 ], SkeuoCameraCard);
 registerCard({
@@ -7333,15 +7373,1941 @@ registerCard({
   },
   preview: true
 });
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc$1 = Object.getOwnPropertyDescriptor;
+var __decorateClass$1 = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc$1(target, key) : target;
+  for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
+    if (decorator = decorators[i4])
+      result = (kind ? decorator(target, key, result) : decorator(result)) || result;
+  if (kind && result) __defProp(target, key, result);
+  return result;
+};
+const STYLES$1 = ["lcd", "analog", "nixie", "flap", "words"];
+const GRILLE_FR = [
+  "ILNESTODEUX",
+  "QUATRETROIS",
+  "NEUFUNESEPT",
+  "HUITSIXCINQ",
+  "MIDIXMINUIT",
+  "ONZERHEURES",
+  "MOINSOLEDIX",
+  "ETRQUARTPMD",
+  "VINGTSCINQU",
+  "ETSDEMIEPAR"
+];
+const GRILLE_EN = [
+  "ITLISASAMPM",
+  "ACQUARTERDC",
+  "TWENTYFIVEX",
+  "HALFSTENFTO",
+  "PASTERUNINE",
+  "ONESIXTHREE",
+  "FOURFIVETWO",
+  "EIGHTELEVEN",
+  "SEVENTWELVE",
+  "TENSEOCLOCK"
+];
+const FR = {
+  ilest: [[0, 0, 2], [0, 3, 3]],
+  heure: [[5, 5, 5]],
+  heures: [[5, 5, 6]],
+  moins: [[6, 0, 5]],
+  le: [[6, 6, 2]],
+  dix: [[6, 8, 3]],
+  et: [[7, 0, 2]],
+  quart: [[7, 3, 5]],
+  vingt: [[8, 0, 5]],
+  cinq: [[8, 6, 4]],
+  etDemie: [[9, 0, 2], [9, 3, 5]],
+  heures12: {
+    1: [[2, 4, 3]],
+    2: [[0, 7, 4]],
+    3: [[1, 6, 5]],
+    4: [[1, 0, 6]],
+    5: [[3, 7, 4]],
+    6: [[3, 4, 3]],
+    7: [[2, 7, 4]],
+    8: [[3, 0, 4]],
+    9: [[2, 0, 4]],
+    10: [[4, 2, 3]],
+    11: [[5, 0, 4]]
+  },
+  midi: [[4, 0, 4]],
+  minuit: [[4, 5, 6]]
+};
+const EN = {
+  itis: [[0, 0, 2], [0, 3, 2]],
+  a: [[1, 0, 1]],
+  quarter: [[1, 2, 7]],
+  twenty: [[2, 0, 6]],
+  five: [[2, 6, 4]],
+  half: [[3, 0, 4]],
+  ten: [[3, 5, 3]],
+  to: [[3, 9, 2]],
+  past: [[4, 0, 4]],
+  oclock: [[9, 5, 6]],
+  heures12: {
+    1: [[5, 0, 3]],
+    2: [[6, 8, 3]],
+    3: [[5, 6, 5]],
+    4: [[6, 0, 4]],
+    5: [[6, 4, 4]],
+    6: [[5, 3, 3]],
+    7: [[8, 0, 5]],
+    8: [[7, 0, 5]],
+    9: [[4, 7, 4]],
+    10: [[9, 0, 3]],
+    11: [[7, 5, 6]],
+    12: [[8, 5, 6]]
+  }
+};
+const motsFr = (h2, m2) => {
+  let pas = Math.round(m2 / 5) * 5;
+  let ref = h2;
+  if (pas > 30) ref = (h2 + 1) % 24;
+  if (pas === 60) pas = 0;
+  let seg = [...FR.ilest];
+  const h12 = ref % 12;
+  if (ref === 12) seg = seg.concat(FR.midi);
+  else if (ref === 0) seg = seg.concat(FR.minuit);
+  else seg = seg.concat(FR.heures12[h12], h12 === 1 ? FR.heure : FR.heures);
+  const reste = pas > 30 ? 60 - pas : pas;
+  if (reste !== 0) {
+    if (pas > 30) seg = seg.concat(FR.moins);
+    if (reste === 5) seg = seg.concat(FR.cinq);
+    else if (reste === 10) seg = seg.concat(FR.dix);
+    else if (reste === 15) seg = seg.concat(pas > 30 ? FR.le : FR.et, FR.quart);
+    else if (reste === 20) seg = seg.concat(FR.vingt);
+    else if (reste === 25) seg = seg.concat(FR.vingt, FR.cinq);
+    else if (reste === 30) seg = seg.concat(FR.etDemie);
+  }
+  return seg;
+};
+const motsEn = (h2, m2) => {
+  let pas = Math.round(m2 / 5) * 5;
+  let ref = h2;
+  if (pas > 30) ref = (h2 + 1) % 24;
+  if (pas === 60) pas = 0;
+  let seg = [...EN.itis];
+  const reste = pas > 30 ? 60 - pas : pas;
+  if (reste !== 0) {
+    if (reste === 5) seg = seg.concat(EN.five);
+    else if (reste === 10) seg = seg.concat(EN.ten);
+    else if (reste === 15) seg = seg.concat(EN.a, EN.quarter);
+    else if (reste === 20) seg = seg.concat(EN.twenty);
+    else if (reste === 25) seg = seg.concat(EN.twenty, EN.five);
+    else if (reste === 30) seg = seg.concat(EN.half);
+    seg = seg.concat(pas > 30 ? EN.to : EN.past);
+  }
+  const h12 = ref % 12 === 0 ? 12 : ref % 12;
+  seg = seg.concat(EN.heures12[h12]);
+  if (reste === 0) seg = seg.concat(EN.oclock);
+  return seg;
+};
+const deux = (n3) => String(n3).padStart(2, "0");
+let SkeuoClockCard = class extends SkeuoBaseCard {
+  constructor() {
+    super(...arguments);
+    this._t = Math.floor(Date.now() / 1e3);
+    this._avant = [];
+  }
+  connectedCallback() {
+    super.connectedCallback();
+    this._demarre();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._arrete();
+  }
+  _demarre() {
+    this._arrete();
+    const versLaSeconde = 1e3 - Date.now() % 1e3;
+    this._timer = window.setTimeout(() => {
+      this._bat();
+      this._timer = window.setInterval(() => this._bat(), 1e3);
+    }, versLaSeconde);
+  }
+  _arrete() {
+    if (this._timer !== void 0) {
+      window.clearTimeout(this._timer);
+      window.clearInterval(this._timer);
+      this._timer = void 0;
+    }
+    if (this._reveil !== void 0) {
+      window.clearTimeout(this._reveil);
+      this._reveil = void 0;
+    }
+  }
+  /**
+   * Le battement ne provoque un rendu que si l'image change réellement. Une
+   * horloge LCD sans clignotement n'a rien de neuf à montrer pendant
+   * cinquante-neuf secondes sur soixante, et le tableau de bord n'a aucune
+   * raison de repeindre pendant ce temps.
+   */
+  _bat() {
+    const t2 = Math.floor(Date.now() / 1e3);
+    if (t2 === this._t) return;
+    const style = this._style;
+    const parSeconde = style === "analog" || this._config?.blink === true;
+    if (!parSeconde && Math.floor(t2 / 60) === Math.floor(this._t / 60)) return;
+    if (style === "flap") this._prepareBascule(t2);
+    this._t = t2;
+  }
+  /** Mémorise les chiffres sortants et programme la fin de l'animation. */
+  _prepareBascule(t2) {
+    const avant = this._chiffres(new Date(this._t * 1e3));
+    const apres = this._chiffres(new Date(t2 * 1e3));
+    if (avant.join("") === apres.join("")) return;
+    this._avant = avant;
+    if (this._reveil !== void 0) window.clearTimeout(this._reveil);
+    this._reveil = window.setTimeout(() => {
+      this._reveil = void 0;
+      const sortants = this._avant;
+      this._avant = [];
+      this.requestUpdate("_avant", sortants);
+    }, 580);
+  }
+  /* ------------------------------------------------------------- config */
+  validateConfig(config) {
+    if (config.style && !STYLES$1.includes(config.style)) {
+      throw new Error(
+        isFrench(this.hass) ? `\`style\` doit valoir ${STYLES$1.join(", ")}` : `\`style\` must be one of ${STYLES$1.join(", ")}`
+      );
+    }
+  }
+  defaultTitle() {
+    return t(this.hass, "clock");
+  }
+  get _style() {
+    return this._config?.style ?? "lcd";
+  }
+  static getConfigForm() {
+    const fr = isFrench();
+    return {
+      schema: [
+        ...baseSchema({ entity: false }),
+        {
+          type: "grid",
+          name: "",
+          schema: [
+            {
+              name: "style",
+              selector: {
+                select: {
+                  mode: "dropdown",
+                  options: fr ? [
+                    { value: "lcd", label: "Écran LCD ambré" },
+                    { value: "analog", label: "Aiguilles" },
+                    { value: "nixie", label: "Tubes Nixie" },
+                    { value: "flap", label: "Volets basculants" },
+                    { value: "words", label: "Matrice de mots" }
+                  ] : [
+                    { value: "lcd", label: "Amber LCD screen" },
+                    { value: "analog", label: "Hands" },
+                    { value: "nixie", label: "Nixie tubes" },
+                    { value: "flap", label: "Split-flap" },
+                    { value: "words", label: "Word matrix" }
+                  ]
+                }
+              }
+            },
+            { name: "blink", selector: { boolean: {} } }
+          ]
+        }
+      ],
+      computeLabel,
+      computeHelper
+    };
+  }
+  static getStubConfig() {
+    return { style: "lcd", texture: DEFAULT_TEXTURE };
+  }
+  /* --------------------------------------------------------------- date */
+  _langue() {
+    return this.hass?.locale?.language ?? this.hass?.language ?? navigator.language ?? "en";
+  }
+  /**
+   * Jour et mois passent par Intl plutôt que par un dictionnaire maison : le
+   * pack ne parle que deux langues, le navigateur les parle toutes.
+   */
+  _texteDate(d2, options) {
+    try {
+      return new Intl.DateTimeFormat(this._langue(), options).format(d2).toUpperCase();
+    } catch {
+      return new Intl.DateTimeFormat("en", options).format(d2).toUpperCase();
+    }
+  }
+  _chiffres(d2) {
+    return [...deux(d2.getHours()), ...deux(d2.getMinutes())];
+  }
+  /** Le séparateur est-il visible à cet instant ? */
+  _pointVisible() {
+    return this._config?.blink !== true || this._t % 2 === 0;
+  }
+  /* -------------------------------------------------------------- rendu */
+  renderContent() {
+    const d2 = new Date(this._t * 1e3);
+    switch (this._style) {
+      case "analog":
+        return this._aiguilles(d2);
+      case "nixie":
+        return this._nixie(d2);
+      case "flap":
+        return this._volets(d2);
+      case "words":
+        return this._mots(d2);
+      default:
+        return this._lcd(d2);
+    }
+  }
+  /** Module d'écran ambré, commun au style LCD et aux modules de date. */
+  _ecran(largeur, hauteur, valeur, taille, lignes) {
+    return b`
+      <div class="ecran" style=${o({ width: `${largeur}px`, height: `${hauteur}px` })}>
+        <div class="vitre" style=${o({ height: `${taille * 1.28}px` })}>
+          <!-- Segments éteints : sur un vrai afficheur à cristaux liquides ils
+               restent visibles en fond, c'est ce qui le distingue d'un écran
+               lumineux.
+
+               Les deux lignes qui suivent tiennent d'un seul tenant, sans
+               retour ni indentation autour de l'expression. La règle
+               white-space: pre garde l'espace du séparateur quand il s'efface,
+               mais elle garderait aussi les blancs du gabarit, et l'heure
+               partirait sur trois lignes décalées de douze espaces. -->
+          <div class="fantome" style=${o({ fontSize: `${taille}px` })}>${valeur.replace(/\d/g, "8")}</div>
+          <div class="valeur" style=${o({ fontSize: `${taille}px`, color: this.accent })}>${valeur}</div>
+        </div>
+        ${lignes.map((l2) => b`<p class="ligne">${l2}</p>`)}
+      </div>
+    `;
+  }
+  _dateEcran(d2) {
+    return this._ecran(196, 150, deux(d2.getDate()), 42, [
+      this._texteDate(d2, { month: "long" }),
+      this._texteDate(d2, { weekday: "long" })
+    ]);
+  }
+  _lcd(d2) {
+    const sep = this._pointVisible() ? ":" : " ";
+    const heure = `${deux(d2.getHours())}${sep}${deux(d2.getMinutes())}`;
+    return b`
+      <div class="face lcd">
+        ${this._ecran(430, 194, heure, 86, [
+      this._texteDate(d2, { weekday: "long", day: "numeric", month: "long" })
+    ])}
+      </div>
+    `;
+  }
+  _aiguilles(d2) {
+    const s2 = d2.getSeconds();
+    const m2 = d2.getMinutes() + s2 / 60;
+    const h2 = d2.getHours() % 12 + m2 / 60;
+    const index = [];
+    for (let i4 = 0; i4 < 60; i4++) {
+      const gros = i4 % 5 === 0;
+      const a2 = i4 * 6 * Math.PI / 180;
+      const r1 = gros ? 74 : 80;
+      index.push(w`
+        <line
+          x1=${108 + r1 * Math.sin(a2)}
+          y1=${108 - r1 * Math.cos(a2)}
+          x2=${108 + 86 * Math.sin(a2)}
+          y2=${108 - 86 * Math.cos(a2)}
+          stroke=${gros ? "#d6d2c9" : "#5c6064"}
+          stroke-width=${gros ? 3.4 : 1.2}
+          stroke-linecap="round"
+        />
+      `);
+    }
+    return b`
+      <div class="face analog">
+        <svg class="cadran" width="212" height="212" viewBox="0 0 216 216" aria-hidden="true">
+          <defs>
+            <linearGradient id="sk-lunette" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#8b8f94" />
+              <stop offset="35%" stop-color="#4a4d51" />
+              <stop offset="65%" stop-color="#2b2e31" />
+              <stop offset="100%" stop-color="#6a6e73" />
+            </linearGradient>
+            <radialGradient id="sk-face" cx="38%" cy="30%">
+              <stop offset="0%" stop-color="#26292d" />
+              <stop offset="60%" stop-color="#141619" />
+              <stop offset="100%" stop-color="#0c0d0f" />
+            </radialGradient>
+            <!-- userSpaceOnUse est obligatoire : une aiguille est un segment de
+                 largeur nulle, sa boîte englobante est dégénérée et un dégradé
+                 en unités de boîte ne peint rien du tout. Les coordonnées fixes
+                 gardent en prime le reflet cohérent quand l'aiguille tourne, la
+                 source de lumière ne bougeant pas. -->
+            <linearGradient
+              id="sk-aiguille"
+              gradientUnits="userSpaceOnUse"
+              x1="50"
+              y1="34"
+              x2="166"
+              y2="182"
+            >
+              <stop offset="0%" stop-color="#f1f3f5" />
+              <stop offset="45%" stop-color="#b9bdc2" />
+              <stop offset="75%" stop-color="#8b8f94" />
+              <stop offset="100%" stop-color="#5e6267" />
+            </linearGradient>
+          </defs>
+          <circle cx="108" cy="108" r="106" fill="url(#sk-lunette)" />
+          <circle cx="108" cy="108" r="97" fill="#0e1012" />
+          <circle cx="108" cy="108" r="93" fill="url(#sk-face)" />
+          <g stroke="rgba(255,255,255,.035)" fill="none">
+            <circle cx="108" cy="108" r="80" />
+            <circle cx="108" cy="108" r="68" />
+            <circle cx="108" cy="108" r="56" />
+            <circle cx="108" cy="108" r="44" />
+            <circle cx="108" cy="108" r="32" />
+          </g>
+          ${index}
+          <g transform=${`rotate(${h2 * 30} 108 108)`}>
+            <line x1="108" y1="118" x2="108" y2="56" stroke="#0a0b0c" stroke-width="9.5"
+              stroke-linecap="round" opacity=".55" />
+            <line x1="108" y1="118" x2="108" y2="56" stroke="url(#sk-aiguille)" stroke-width="7"
+              stroke-linecap="round" />
+          </g>
+          <g transform=${`rotate(${m2 * 6} 108 108)`}>
+            <line x1="108" y1="122" x2="108" y2="32" stroke="#0a0b0c" stroke-width="7"
+              stroke-linecap="round" opacity=".55" />
+            <line x1="108" y1="122" x2="108" y2="32" stroke="url(#sk-aiguille)" stroke-width="4.5"
+              stroke-linecap="round" />
+          </g>
+          <line x1="108" y1="120" x2="108" y2="30" stroke=${this.accent} stroke-width="1.8"
+            stroke-linecap="round" transform=${`rotate(${s2 * 6} 108 108)`} />
+          <circle cx="108" cy="108" r="6" fill="#3a3d41" stroke="#6f7378" stroke-width="1" />
+          <circle cx="108" cy="108" r="2.4" fill=${this.accent} />
+        </svg>
+        ${this._dateEcran(d2)}
+      </div>
+    `;
+  }
+  _nixie(d2) {
+    const c2 = this._chiffres(d2);
+    const tube = (chiffre) => b`
+      <div class="tube">
+        <div class="verre"></div>
+        <div class="eteint">8</div>
+        <div class="allume">${chiffre}</div>
+        <div class="maille"></div>
+        <div class="culot"></div>
+        <i class="reflet"></i>
+      </div>
+    `;
+    const neon = (haut) => b`
+      <div class=${e({ neon: true, haut, bas: !haut })}>
+        <i class="ampoule"></i>
+        <i class="plasma" style=${o({ opacity: this._pointVisible() ? "1" : "0.14" })}></i>
+        <i class="pattes"></i>
+      </div>
+    `;
+    return b`
+      <div class="face nixie">
+        <div class="bloc">
+          <div class="socle"><i class="plateau"></i><i class="chrome"></i></div>
+          <div class="rangee">
+            ${tube(c2[0])}${tube(c2[1])}
+            <div class="neons">${neon(true)}${neon(false)}</div>
+            ${tube(c2[2])}${tube(c2[3])}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  _volets(d2) {
+    const c2 = this._chiffres(d2);
+    const avant = this._avant.length === 4 ? this._avant : c2;
+    const module = (i4) => {
+      const anime = avant[i4] !== c2[i4];
+      return b`
+        <div class=${e({ volet: true, bascule: anime })}>
+          <div class="moitie haut"><span>${c2[i4]}</span></div>
+          <div class="moitie bas"><span>${anime ? avant[i4] : c2[i4]}</span></div>
+          <div class="rabat h"><span>${avant[i4]}</span></div>
+          <div class="rabat b"><span>${c2[i4]}</span></div>
+          <div class="charniere"></div>
+          <i class="axe g"></i><i class="axe d"></i>
+        </div>
+      `;
+    };
+    const visible = this._pointVisible();
+    const mini = () => b`
+      <div class="mini">
+        <div class="m h"><span class=${visible ? "plein" : ""}></span></div>
+        <div class="m b"><span class=${visible ? "plein" : ""}></span></div>
+        <div class="ch"></div>
+      </div>
+    `;
+    const date = this._texteDate(d2, { day: "2-digit", month: "short" }).replace(/\./g, "");
+    return b`
+      <div class="face flap">
+        <div class="cadre">
+          <i class="tige"></i>
+          <div class="rangee">
+            ${module(0)}${module(1)}
+            <div class="deux-points">${mini()}${mini()}</div>
+            ${module(2)}${module(3)}
+          </div>
+          <div class="bandeau">
+            ${[...date].map(
+      (l2) => l2 === " " ? b`<b class="vide">&nbsp;</b>` : b`<b>${l2}</b>`
+    )}
+          </div>
+          <i class="flasque g"></i><i class="flasque d"></i>
+        </div>
+      </div>
+    `;
+  }
+  _mots(d2) {
+    const fr = isFrench(this.hass);
+    const grille = fr ? GRILLE_FR : GRILLE_EN;
+    const segments = fr ? motsFr(d2.getHours(), d2.getMinutes()) : motsEn(d2.getHours(), d2.getMinutes());
+    const allumees = /* @__PURE__ */ new Set();
+    for (const [ligne, depart, longueur] of segments) {
+      for (let i4 = 0; i4 < longueur; i4++) allumees.add(`${ligne}:${depart + i4}`);
+    }
+    return b`
+      <div class="face words">
+        <div class="matrice">
+          ${grille.map(
+      (ligne, y3) => [...ligne].map(
+        (lettre, x2) => b`<b class=${allumees.has(`${y3}:${x2}`) ? "on" : A}>${lettre}</b>`
+      )
+    )}
+        </div>
+        ${this._dateEcran(d2)}
+      </div>
+    `;
+  }
+};
+SkeuoClockCard.requiresEntity = false;
+SkeuoClockCard.styles = [
+  SkeuoBaseCard.styles,
+  i$5`
+      .face {
+        display: flex;
+        align-items: center;
+        justify-content: space-evenly;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* ------------------------------------------------------------ écran */
+
+      .ecran {
+        position: relative;
+        box-sizing: border-box;
+        flex: none;
+        border-radius: 14px;
+        padding: 14px 16px 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        /* Creux : zone sombre en haut-gauche, reflet en bas-droite. */
+        background: radial-gradient(ellipse at 50% 30%, #241a10, #140d07 75%);
+        box-shadow:
+          inset 5px 5px 3px rgba(0, 0, 0, 0.9),
+          inset 3px 3px 9px rgba(0, 0, 0, 0.85),
+          inset -2px -2px 2px rgba(255, 255, 255, 0.05),
+          0 0 0 3.4px #100b06,
+          5px 5px 9px rgba(0, 0, 0, 0.55);
+      }
+      .vitre {
+        position: relative;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .fantome,
+      .valeur {
+        font-family: var(--skeuo-font-lcd);
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 2px;
+        white-space: pre;
+      }
+      .fantome {
+        color: rgba(226, 166, 89, 0.07);
+      }
+      .valeur {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-shadow: 0 0 12px currentColor;
+      }
+      .ligne {
+        flex: none;
+        margin: 8px 0 0;
+        font-family: var(--skeuo-font-lcd);
+        font-size: 14px;
+        letter-spacing: 0.9px;
+        text-transform: uppercase;
+        color: #cf9a5c;
+        text-align: center;
+        line-height: 1.3;
+      }
+
+      /* --------------------------------------------------------- aiguilles */
+
+      .cadran {
+        flex: none;
+        filter: drop-shadow(5px 6px 10px rgba(0, 0, 0, 0.6));
+      }
+
+      /* ------------------------------------------------------------- nixie */
+
+      .nixie .bloc {
+        position: relative;
+        padding-bottom: 50px;
+      }
+      .nixie .rangee {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      /* Socle chromé. Le chrome ne se reconnaît pas à son brillant mais à sa
+         ligne d'horizon : une bascule nette entre le ciel réfléchi en haut et
+         le sol en bas, presque sans transition. */
+      .socle {
+        position: absolute;
+        left: -14px;
+        right: -14px;
+        bottom: 0;
+        height: 42px;
+      }
+      .socle .plateau {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 8px;
+        border-radius: 4px 4px 0 0;
+        background:
+          linear-gradient(
+            105deg,
+            rgba(255, 255, 255, 0.34) 0%,
+            rgba(255, 255, 255, 0.1) 24%,
+            rgba(255, 255, 255, 0) 50%,
+            rgba(0, 0, 0, 0.22) 100%
+          ),
+          linear-gradient(180deg, #b7bec4 0%, #7d848a 45%, #4a5055 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      }
+      .socle .chrome {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 8px;
+        bottom: 0;
+        border-radius: 0 0 5px 5px;
+        background:
+          linear-gradient(
+            102deg,
+            rgba(255, 255, 255, 0.26) 0%,
+            rgba(255, 255, 255, 0.05) 18%,
+            rgba(255, 255, 255, 0) 42%,
+            rgba(0, 0, 0, 0.26) 100%
+          ),
+          linear-gradient(
+            180deg,
+            #f7f9fa 0%,
+            #dee4e9 7%,
+            #a9b1b7 18%,
+            #6e757b 29%,
+            #2a2f33 39%,
+            #16191c 45%,
+            #16191c 55%,
+            #3b4247 59%,
+            #7e858b 67%,
+            #bbc2c8 77%,
+            #e8ecef 86%,
+            #f6f8fa 92%,
+            #a8afb5 97%,
+            #6a7177 100%
+          );
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.5),
+          inset -1px 0 0 rgba(0, 0, 0, 0.4),
+          5px 7px 12px rgba(0, 0, 0, 0.65);
+      }
+      .tube {
+        position: relative;
+        width: 84px;
+        height: 168px;
+        flex: none;
+      }
+      .tube .verre {
+        position: absolute;
+        inset: 0;
+        border-radius: 42px 42px 16px 16px;
+        background:
+          linear-gradient(
+            112deg,
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.1) 16%,
+            rgba(255, 255, 255, 0.02) 38%,
+            rgba(255, 255, 255, 0) 58%,
+            rgba(0, 0, 0, 0.3) 100%
+          ),
+          radial-gradient(
+            ellipse at 50% 60%,
+            rgba(255, 150, 40, 0.26) 0%,
+            rgba(255, 120, 20, 0.08) 46%,
+            rgba(0, 0, 0, 0) 74%
+          ),
+          linear-gradient(180deg, #1d2026 0%, #0f1114 55%, #1b1e23 100%);
+        box-shadow:
+          inset 4px 4px 10px rgba(0, 0, 0, 0.85),
+          inset -3px -3px 7px rgba(255, 255, 255, 0.1),
+          0 0 0 2px #08090b,
+          0 0 18px rgba(255, 120, 20, 0.14),
+          6px 7px 14px rgba(0, 0, 0, 0.65);
+      }
+      .tube .verre::after {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 16px;
+        width: 7px;
+        bottom: 30px;
+        border-radius: 4px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.3),
+          rgba(255, 255, 255, 0.05) 55%,
+          rgba(255, 255, 255, 0)
+        );
+        filter: blur(1.2px);
+      }
+      .tube .maille {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 26px;
+        bottom: 40px;
+        border-radius: 6px;
+        background-image:
+          repeating-linear-gradient(0deg, rgba(190, 200, 210, 0.15) 0 1px, transparent 1px 5px),
+          repeating-linear-gradient(90deg, rgba(190, 200, 210, 0.12) 0 1px, transparent 1px 5px);
+      }
+      .tube .eteint,
+      .tube .allume {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 24px;
+        text-align: center;
+        font-size: 96px;
+        line-height: 1;
+        font-weight: 400;
+      }
+      .tube .eteint {
+        color: rgba(150, 120, 90, 0.1);
+      }
+      .tube .allume {
+        color: #ff9a37;
+        text-shadow:
+          0 0 6px #ff8c2a,
+          0 0 18px rgba(255, 120, 20, 0.75),
+          0 0 42px rgba(255, 90, 0, 0.45);
+      }
+      /* Culot bakélite, plus étroit que le verre : c'est le collier de
+         fixation, il pose le tube sur la plaque au lieu de l'étaler dessus. */
+      .tube .culot {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: -8px;
+        height: 24px;
+        border-radius: 3px 3px 2px 2px;
+        background:
+          linear-gradient(
+            105deg,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(255, 255, 255, 0.02) 30%,
+            rgba(0, 0, 0, 0.18) 100%
+          ),
+          linear-gradient(180deg, #3a3c34 0%, #24261d 50%, #101106 100%);
+        box-shadow:
+          inset 0 1px 1px rgba(255, 255, 255, 0.14),
+          inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+          3px 5px 8px rgba(0, 0, 0, 0.7);
+      }
+      /* Le chrome réfléchit verticalement : la lueur du tube s'y étire en
+         traînée descendante, pas en flaque ronde. */
+      .tube .reflet {
+        position: absolute;
+        left: 24px;
+        right: 24px;
+        bottom: -46px;
+        height: 26px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 150, 55, 0.22) 0%,
+          rgba(255, 130, 25, 0.1) 34%,
+          rgba(255, 110, 10, 0.03) 66%,
+          rgba(255, 110, 10, 0) 100%
+        );
+        filter: blur(5px);
+      }
+      /* Séparateur : deux ampoules néon montées sur la platine, comme les INS-1
+         des vrais montages, et non deux pastilles suspendues. */
+      .neons {
+        position: relative;
+        width: 26px;
+        height: 168px;
+        flex: none;
+      }
+      .neon {
+        position: absolute;
+        left: 3px;
+        width: 20px;
+        height: 34px;
+      }
+      .neon.haut {
+        top: 40px;
+        --patte: 102px;
+      }
+      .neon.bas {
+        top: 92px;
+        --patte: 50px;
+      }
+      .neon .ampoule {
+        position: absolute;
+        inset: 0;
+        border-radius: 10px 10px 5px 5px;
+        background:
+          linear-gradient(
+            108deg,
+            rgba(255, 255, 255, 0.28) 0%,
+            rgba(255, 255, 255, 0.06) 30%,
+            rgba(255, 255, 255, 0) 56%,
+            rgba(0, 0, 0, 0.25) 100%
+          ),
+          linear-gradient(180deg, #1b1e22 0%, #101316 60%, #1a1d21 100%);
+        box-shadow:
+          inset 2px 2px 5px rgba(0, 0, 0, 0.8),
+          inset -1px -1px 3px rgba(255, 255, 255, 0.1),
+          0 0 0 1px #0a0b0d,
+          3px 4px 7px rgba(0, 0, 0, 0.6);
+      }
+      /* Le plasma n'occupe pas toute l'ampoule : c'est une petite décharge sur
+         l'électrode, plus rouge que l'orange des chiffres nixie. */
+      .neon .plasma {
+        position: absolute;
+        left: 50%;
+        top: 10px;
+        width: 9px;
+        height: 13px;
+        margin-left: -4.5px;
+        border-radius: 4px;
+        background: radial-gradient(
+          ellipse at 45% 35%,
+          #ffd6a6 0%,
+          #ff7a24 40%,
+          #e0400a 76%,
+          rgba(224, 64, 10, 0) 100%
+        );
+        box-shadow:
+          0 0 7px rgba(255, 90, 20, 0.95),
+          0 0 17px rgba(255, 60, 0, 0.55);
+      }
+      .neon .pattes {
+        position: absolute;
+        left: 5px;
+        right: 5px;
+        top: 34px;
+        height: var(--patte);
+      }
+      .neon .pattes::before,
+      .neon .pattes::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        width: 1.4px;
+        height: 100%;
+        background: linear-gradient(180deg, #9aa0a6 0%, #6b7176 45%, #43484d 100%);
+      }
+      .neon .pattes::before {
+        left: 1px;
+      }
+      .neon .pattes::after {
+        right: 1px;
+      }
+
+      /* ------------------------------------------------------------ volets */
+
+      /* Les modules ne sont pas posés côte à côte, ils sont enfilés sur un axe
+         unique tenu par deux joues, et l'ensemble est encastré dans un bâti.
+         C'est ce qui distingue un panneau Solari d'une rangée de cartes. */
+      .cadre {
+        position: relative;
+        padding: 14px 26px 16px;
+        border-radius: 9px;
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.045) 0%, rgba(0, 0, 0, 0.32) 68%),
+          linear-gradient(180deg, #1b1d20 0%, #0f1114 60%, #15171a 100%);
+        box-shadow:
+          inset 3px 3px 9px rgba(0, 0, 0, 0.88),
+          inset -2px -2px 4px rgba(255, 255, 255, 0.05),
+          0 0 0 2px #0a0b0c,
+          6px 8px 15px rgba(0, 0, 0, 0.6);
+      }
+      .cadre .tige {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 73px;
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(
+          180deg,
+          #e4e9ed 0%,
+          #a6adb3 24%,
+          #4d5359 50%,
+          #7d848a 70%,
+          #2c3135 100%
+        );
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.75);
+      }
+      .cadre .flasque {
+        position: absolute;
+        top: 8px;
+        width: 12px;
+        height: 136px;
+        border-radius: 3px;
+        background:
+          linear-gradient(
+            102deg,
+            rgba(255, 255, 255, 0.14) 0%,
+            rgba(255, 255, 255, 0.02) 38%,
+            rgba(0, 0, 0, 0.32) 100%
+          ),
+          linear-gradient(180deg, #40464b 0%, #262b2f 48%, #14171a 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 3px 5px 8px rgba(0, 0, 0, 0.62);
+      }
+      .cadre .flasque.g {
+        left: 7px;
+      }
+      .cadre .flasque.d {
+        right: 7px;
+      }
+      .cadre .flasque::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 62px;
+        width: 12px;
+        height: 12px;
+        margin-left: -6px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 36% 32%, #bcc3c9 0%, #6d7379 55%, #2a2f33 100%);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 1px 2px 3px rgba(0, 0, 0, 0.7);
+      }
+      /* Jeu volontairement large : c'est par là qu'on voit l'axe, et c'est ce
+         qui fait comprendre que les modules sont enfilés dessus. */
+      .flap .rangee {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+      .volet {
+        position: relative;
+        width: 84px;
+        height: 124px;
+        flex: none;
+        border-radius: 7px;
+        font-size: 82px;
+        line-height: 124px;
+        font-weight: 500;
+        color: #edeae2;
+        text-align: center;
+        perspective: 340px;
+        box-shadow: 5px 6px 12px rgba(0, 0, 0, 0.6);
+      }
+      .volet .moitie,
+      .volet .rabat {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 62px;
+        overflow: hidden;
+      }
+      .volet .haut,
+      .volet .rabat.h {
+        top: 0;
+        border-radius: 7px 7px 0 0;
+        background: linear-gradient(180deg, #3a3d41 0%, #2a2d31 100%);
+      }
+      .volet .bas,
+      .volet .rabat.b {
+        bottom: 0;
+        border-radius: 0 0 7px 7px;
+        background: linear-gradient(180deg, #202327 0%, #16181b 100%);
+      }
+      .volet .bas span,
+      .volet .rabat.b span {
+        display: block;
+        margin-top: -62px;
+      }
+      .volet .rabat {
+        z-index: 3;
+        backface-visibility: hidden;
+      }
+      .volet .rabat.h {
+        transform-origin: bottom;
+      }
+      .volet .rabat.b {
+        transform-origin: top;
+        transform: rotateX(90deg);
+      }
+      .volet.bascule .rabat.h {
+        animation: sk-tombe 0.26s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+      }
+      .volet.bascule .rabat.b {
+        animation: sk-monte 0.26s cubic-bezier(0.1, 0.4, 0.5, 1) 0.26s forwards;
+      }
+      @keyframes sk-tombe {
+        to {
+          transform: rotateX(-90deg);
+        }
+      }
+      @keyframes sk-monte {
+        to {
+          transform: rotateX(0deg);
+        }
+      }
+      .volet .charniere {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 61px;
+        height: 2px;
+        background: #0a0b0c;
+        z-index: 4;
+      }
+      /* Moyeu : le point où l'axe traverse le module, aligné sur la charnière. */
+      .volet .axe {
+        position: absolute;
+        top: 57px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        z-index: 5;
+        background: radial-gradient(circle at 35% 30%, #aeb5bb 0%, #61676d 55%, #24282c 100%);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 1px 2px 3px rgba(0, 0, 0, 0.75);
+      }
+      .volet .axe.g {
+        left: -5px;
+      }
+      .volet .axe.d {
+        right: -5px;
+      }
+      /* Deux-points : deux mini-modules à volet, pas des pastilles. */
+      .deux-points {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        flex: none;
+      }
+      .mini {
+        position: relative;
+        width: 26px;
+        height: 32px;
+        box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.6);
+      }
+      .mini .m {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 16px;
+        overflow: hidden;
+      }
+      .mini .m.h {
+        top: 0;
+        border-radius: 3px 3px 0 0;
+        background: linear-gradient(180deg, #3a3d41 0%, #2a2d31 100%);
+      }
+      .mini .m.b {
+        bottom: 0;
+        border-radius: 0 0 3px 3px;
+        background: linear-gradient(180deg, #202327 0%, #16181b 100%);
+      }
+      .mini span {
+        display: block;
+        width: 26px;
+        height: 32px;
+      }
+      .mini .m.b span {
+        margin-top: -16px;
+      }
+      .mini span.plein {
+        background: radial-gradient(
+          circle at 13px 16px,
+          #e9e6de 0 5.4px,
+          rgba(233, 230, 222, 0) 6.1px
+        );
+      }
+      .mini .ch {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 15px;
+        height: 1.5px;
+        background: #0a0b0c;
+        z-index: 4;
+      }
+      .bandeau {
+        margin-top: 10px;
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+      }
+      .bandeau b {
+        position: relative;
+        display: block;
+        width: 25px;
+        height: 33px;
+        border-radius: 3px;
+        font-size: 20px;
+        line-height: 33px;
+        font-weight: 500;
+        text-align: center;
+        color: #d9d5cc;
+        background: linear-gradient(180deg, #34373b 0%, #292c30 49%, #1b1d20 51%, #17191c 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 2px 3px 5px rgba(0, 0, 0, 0.55);
+      }
+      /* Sans ce trait, la date se lit comme des étiquettes et non des volets. */
+      .bandeau b:not(.vide)::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 16px;
+        height: 1.2px;
+        background: #0a0b0c;
+      }
+      .bandeau b.vide {
+        background: none;
+        box-shadow: none;
+        width: 10px;
+      }
+
+      /* -------------------------------------------------------------- mots */
+
+      .matrice {
+        display: grid;
+        grid-template-columns: repeat(11, 20px);
+        gap: 2px;
+        flex: none;
+        padding: 13px 15px;
+        border-radius: 12px;
+        background: radial-gradient(ellipse at 40% 25%, #1b1d20, #0e0f11 75%);
+        box-shadow:
+          inset 4px 4px 8px rgba(0, 0, 0, 0.85),
+          inset -2px -2px 3px rgba(255, 255, 255, 0.05),
+          0 0 0 3px #0b0c0d,
+          5px 6px 11px rgba(0, 0, 0, 0.55);
+      }
+      .matrice b {
+        font-weight: 400;
+        font-size: 14px;
+        line-height: 18px;
+        text-align: center;
+        color: #2f3236;
+      }
+      .matrice b.on {
+        color: var(--skeuo-accent);
+        text-shadow: 0 0 9px rgba(226, 166, 89, 0.85);
+      }
+    `
+];
+__decorateClass$1([
+  r()
+], SkeuoClockCard.prototype, "_t", 2);
+SkeuoClockCard = __decorateClass$1([
+  t$2("skeuo-clock-card")
+], SkeuoClockCard);
+registerCard({
+  type: "skeuo-clock-card",
+  name: { fr: "Skeuo · Horloge", en: "Skeuo · Clock" },
+  description: {
+    fr: "Horloge en cinq styles : écran LCD, aiguilles, tubes Nixie, volets basculants, matrice de mots.",
+    en: "Clock in five styles: LCD screen, hands, Nixie tubes, split-flap, word matrix."
+  },
+  preview: true
+});
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __decorateClass = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key) : target;
+  for (var i4 = decorators.length - 1, decorator; i4 >= 0; i4--)
+    if (decorator = decorators[i4])
+      result = decorator(result) || result;
+  return result;
+};
+const STYLES = ["annunciator", "lamp", "flap"];
+const DOMAINES = [
+  "binary_sensor",
+  "light",
+  "switch",
+  "input_boolean",
+  "fan",
+  "lock",
+  "cover",
+  "person",
+  "device_tracker",
+  "automation",
+  "media_player",
+  "sun"
+];
+const ALARMES = [
+  "smoke",
+  "gas",
+  "carbon_monoxide",
+  "safety",
+  "tamper",
+  "problem",
+  "moisture",
+  "heat"
+];
+const TEINTES = {
+  red: { haut: "#ff8a6a", bas: "#c62d16", halo: "rgba(230,70,35,.75)" },
+  amber: { haut: "#ffd9a3", bas: "#d78a28", halo: "rgba(226,166,89,.75)" }
+};
+const SOURDINE = {
+  red: { haut: "#6b3229", bas: "#2b1310", halo: "rgba(0,0,0,0)" },
+  amber: { haut: "#6a512e", bas: "#2a2013", halo: "rgba(0,0,0,0)" }
+};
+let SkeuoBinaryCard = class extends SkeuoBaseCard {
+  constructor() {
+    super(...arguments);
+    this._mots = [];
+    this._avant = [];
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._reveil !== void 0) {
+      window.clearTimeout(this._reveil);
+      this._reveil = void 0;
+    }
+  }
+  willUpdate(changed) {
+    super.willUpdate(changed);
+    if (this._style !== "flap" || !this.hass) return;
+    const mots = this._voyants().map((v2) => v2.etat);
+    if (this._mots.length !== mots.length) {
+      this._mots = mots;
+      this._avant = [];
+      return;
+    }
+    if (!mots.some((m2, i4) => m2 !== this._mots[i4])) return;
+    this._avant = this._mots;
+    this._mots = mots;
+    if (this._reveil !== void 0) window.clearTimeout(this._reveil);
+    this._reveil = window.setTimeout(() => {
+      this._reveil = void 0;
+      const sortants = this._avant;
+      this._avant = [];
+      this.requestUpdate("_avant", sortants);
+    }, 580);
+  }
+  validateConfig(config) {
+    const liste = config.entities;
+    if (!Array.isArray(liste) || liste.length === 0) {
+      throw new Error(
+        isFrench(this.hass) ? "`entities` doit contenir au moins une entité." : "`entities` must contain at least one entity."
+      );
+    }
+    if (config.style && !STYLES.includes(config.style)) {
+      throw new Error(
+        isFrench(this.hass) ? `\`style\` doit valoir ${STYLES.join(", ")}` : `\`style\` must be one of ${STYLES.join(", ")}`
+      );
+    }
+  }
+  /**
+   * Avec un seul capteur, le titre prend son nom, comme sur les quatorze autres
+   * cartes du pack : sinon la carte répète la même chose deux fois, une en
+   * bandeau et une sous le voyant.
+   */
+  defaultTitle() {
+    const seul = this._entrees;
+    if (seul.length === 1) {
+      const stateObj = this.hass?.states[seul[0].entity];
+      if (stateObj) return computeEntityName(stateObj);
+    }
+    return t(this.hass, "status_panel");
+  }
+  /**
+   * Registre d'affichage. Un capteur unique sur un plan de 615 sur 310 laisse
+   * une carte quasiment vide si on garde la mise en page de panneau : aucune
+   * autre carte du pack ne fait ça, elles remplissent toutes leur façade. En
+   * dessous de trois, les indicateurs grossissent au lieu de flotter.
+   */
+  _registre(n3) {
+    if (n3 === 1) return "solo";
+    if (n3 === 2) return "duo";
+    return "panneau";
+  }
+  /** La liste accepte une chaîne ou un objet, comme les cartes natives. */
+  get _entrees() {
+    return (this._config?.entities ?? []).map(
+      (e2) => typeof e2 === "string" ? { entity: e2 } : e2
+    );
+  }
+  entityIds() {
+    return this._entrees.map((e2) => e2.entity);
+  }
+  get _style() {
+    return this._config?.style ?? "annunciator";
+  }
+  static getConfigForm() {
+    const fr = isFrench();
+    return {
+      schema: [
+        ...baseSchema({ entity: false }),
+        {
+          name: "entities",
+          required: true,
+          selector: {
+            entity: { multiple: true, filter: { domain: DOMAINES } }
+          }
+        },
+        {
+          name: "style",
+          selector: {
+            select: {
+              mode: "dropdown",
+              options: fr ? [
+                { value: "annunciator", label: "Annonciateur rétroéclairé" },
+                { value: "lamp", label: "Voyants à lentille" },
+                { value: "flap", label: "Volets mécaniques" }
+              ] : [
+                { value: "annunciator", label: "Backlit annunciator" },
+                { value: "lamp", label: "Indicator lamps" },
+                { value: "flap", label: "Split-flap" }
+              ]
+            }
+          }
+        }
+      ],
+      computeLabel,
+      computeHelper
+    };
+  }
+  static getStubConfig(_hass, entities, entitiesFallback) {
+    const dispo = [...entities, ...entitiesFallback].filter(
+      (e2) => e2.startsWith("binary_sensor.")
+    );
+    return {
+      entities: dispo.length ? dispo.slice(0, 4) : ["binary_sensor.porte"],
+      style: "annunciator",
+      texture: DEFAULT_TEXTURE
+    };
+  }
+  /* ------------------------------------------------------------ lecture */
+  /**
+   * Allumage d'un voyant. `isActive` couvre la plupart des domaines, un volet
+   * `open`, une serrure `unlocked`, un lecteur `playing`, mais il tient pour
+   * actif tout état qui n'est pas un arrêt. Une personne absente dit pourtant
+   * `not_home` ou le nom d'une zone, et le soleil couché `below_horizon` : leur
+   * voyant s'allumerait. Ces domaines ont donc leur propre règle, posée ici et
+   * non dans `isActive`, que les autres cartes du pack partagent.
+   */
+  _actif(stateObj) {
+    if (!stateObj) return false;
+    switch (stateObj.entity_id.split(".")[0]) {
+      case "person":
+      case "device_tracker":
+        return stateObj.state === "home";
+      case "sun":
+        return stateObj.state === "above_horizon";
+      default:
+        return isActive(stateObj);
+    }
+  }
+  _voyants() {
+    return this._entrees.map((e2) => {
+      const stateObj = this.hass?.states[e2.entity];
+      const injoignable = isUnavailable(stateObj);
+      const classe = stateObj?.attributes.device_class;
+      const teinte = e2.color ?? (classe && ALARMES.includes(classe) ? "red" : "amber");
+      return {
+        entity: e2.entity,
+        nom: stateObj ? computeEntityName(stateObj) : e2.entity,
+        etat: injoignable ? t(this.hass, "unavailable") : formatState(this.hass, stateObj),
+        // Pas une comparaison à `on` : la carte accepte tous les domaines à
+        // deux états, et ils ne les nomment pas pareil. L'inversion ne touche
+        // que l'allumage, le libellé reste celui que Home Assistant donne pour
+        // l'état réel.
+        allume: !injoignable && this._actif(stateObj) !== !!e2.invert,
+        teinte,
+        injoignable
+      };
+    });
+  }
+  _ouvrir(entity) {
+    if (this.preview) return;
+    fireEvent(this, "hass-more-info", { entityId: entity });
+  }
+  _touche(ev, entity) {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    ev.preventDefault();
+    this._ouvrir(entity);
+  }
+  /* -------------------------------------------------------------- rendu */
+  renderContent() {
+    const voyants = this._voyants();
+    switch (this._style) {
+      case "lamp":
+        return this._lampes(voyants);
+      case "flap":
+        return this._volets(voyants);
+      default:
+        return this._annonciateur(voyants);
+    }
+  }
+  _annonciateur(voyants) {
+    const n3 = voyants.length;
+    const registre = this._registre(n3);
+    const cols = registre !== "panneau" ? 1 : n3 === 3 ? 3 : n3 <= 4 ? 2 : n3 <= 6 ? 3 : 4;
+    const largeur = registre === "panneau" ? Math.round((512 - (cols - 1) * 12) / cols) : 508;
+    const police = registre === "solo" ? 34 : registre === "duo" ? 22 : cols === 2 ? 17 : cols === 3 ? 14 : 12;
+    return b`
+      <div
+        class=${e({ annonciateur: true, solo: registre === "solo", duo: registre === "duo" })}
+        style=${o({
+      "--cols": String(cols),
+      "--case": `${largeur}px`,
+      "--police": `${police}px`
+    })}
+      >
+        ${voyants.map((v2) => {
+      const teinte = v2.allume ? TEINTES[v2.teinte] : void 0;
+      return b`
+            <div
+              class=${e({ case: true, on: v2.allume, morte: v2.injoignable })}
+              style=${o(
+        teinte ? { "--haut": teinte.haut, "--bas": teinte.bas, "--halo": teinte.halo } : {}
+      )}
+              role="button"
+              tabindex="0"
+              title=${`${v2.nom} : ${v2.etat}`}
+              @click=${() => this._ouvrir(v2.entity)}
+              @keydown=${(ev) => this._touche(ev, v2.entity)}
+            >
+              ${registre === "solo" ? A : b`<b>${v2.nom}</b>`}
+              <i>${v2.etat}</i>
+            </div>
+          `;
+    })}
+      </div>
+    `;
+  }
+  _lampes(voyants) {
+    const n3 = voyants.length;
+    const registre = this._registre(n3);
+    const large = n3 <= 4;
+    const cols = registre === "solo" ? 1 : large ? n3 : Math.ceil(n3 / 2);
+    const lentille = registre === "solo" ? 160 : registre === "duo" ? 116 : large ? 84 : n3 <= 6 ? 58 : 54;
+    const col = registre === "solo" ? 160 : registre === "duo" ? 190 : large ? 108 : n3 <= 6 ? 96 : 92;
+    const gx = registre === "duo" ? 60 : large ? 30 : n3 <= 6 ? 24 : 16;
+    return b`
+      <div
+        class=${e({ voyants: true, solo: registre === "solo", duo: registre === "duo" })}
+        style=${o({
+      "--cols": String(cols),
+      "--col": `${col}px`,
+      "--lentille": `${lentille}px`,
+      "--gx": `${gx}px`,
+      "--gy": large ? "0px" : "10px"
+    })}
+      >
+        ${voyants.map((v2) => {
+      const teinte = (v2.allume ? TEINTES : SOURDINE)[v2.teinte];
+      return b`
+            <div
+              class=${e({ voyant: true, on: v2.allume, morte: v2.injoignable })}
+              style=${o({
+        "--haut": teinte.haut,
+        "--bas": teinte.bas,
+        "--halo": teinte.halo
+      })}
+              role="button"
+              tabindex="0"
+              title=${`${v2.nom} : ${v2.etat}`}
+              @click=${() => this._ouvrir(v2.entity)}
+              @keydown=${(ev) => this._touche(ev, v2.entity)}
+            >
+              <div class="lunette"><i class="lentille"></i></div>
+              <div class="etiquette">
+                ${registre === "solo" ? A : b`<span class="nom">${v2.nom}</span>`}
+                ${large ? b`<span class="etat">${v2.etat}</span>` : A}
+              </div>
+            </div>
+          `;
+    })}
+      </div>
+    `;
+  }
+  _volets(voyants) {
+    const n3 = voyants.length;
+    const registre = this._registre(n3);
+    const cols = registre === "solo" ? 1 : n3 <= 4 ? n3 : Math.ceil(n3 / 2);
+    const hauteur = registre === "solo" ? 104 : registre === "duo" ? 84 : n3 <= 4 ? 62 : 52;
+    const colonne = registre === "solo" ? 340 : registre === "duo" ? 240 : 118;
+    const police = registre === "solo" ? 40 : registre === "duo" ? 28 : 21;
+    return b`
+      <div
+        class=${e({ volets: true, solo: registre === "solo", duo: registre === "duo" })}
+        style=${o({
+      "--cols": String(cols),
+      "--hvolet": `${hauteur}px`,
+      "--colonne": `${colonne}px`,
+      "--police": `${police}px`
+    })}
+      >
+        ${voyants.map((v2, i4) => {
+      const accent = v2.allume ? TEINTES[v2.teinte].haut : "#edeae2";
+      const sortant = this._avant.length === voyants.length ? this._avant[i4] : v2.etat;
+      const anime = sortant !== v2.etat;
+      return b`
+            <div
+              class=${e({ colonne: true, morte: v2.injoignable })}
+              role="button"
+              tabindex="0"
+              title=${`${v2.nom} : ${v2.etat}`}
+              @click=${() => this._ouvrir(v2.entity)}
+              @keydown=${(ev) => this._touche(ev, v2.entity)}
+            >
+              ${registre === "solo" ? A : b`<div class="titre-col">${v2.nom}</div>`}
+              <div
+                class=${e({ volet: true, actif: v2.allume, bascule: anime })}
+                style=${o({ "--accent-volet": accent })}
+              >
+                <div class="moitie haut"><span>${v2.etat}</span></div>
+                <div class="moitie bas"><span>${anime ? sortant : v2.etat}</span></div>
+                <div class="rabat h"><span>${sortant}</span></div>
+                <div class="rabat b"><span>${v2.etat}</span></div>
+                <div class="charniere"></div>
+                <i class="axe g"></i><i class="axe d"></i>
+              </div>
+            </div>
+          `;
+    })}
+      </div>
+    `;
+  }
+};
+SkeuoBinaryCard.requiresEntity = false;
+SkeuoBinaryCard.styles = [
+  SkeuoBaseCard.styles,
+  i$5`
+      [role="button"] {
+        cursor: pointer;
+        outline: none;
+      }
+      [role="button"]:focus-visible {
+        box-shadow: 0 0 0 2px var(--skeuo-accent);
+        border-radius: 6px;
+      }
+      /* Capteur injoignable : la case se désature sur place plutôt que de
+         disparaître, sinon le panneau change de forme dès qu'une pile meurt. */
+      .morte {
+        filter: grayscale(1) brightness(0.7);
+      }
+
+      /* ------------------------------------------------- 1. annonciateur */
+
+      /* Flux et non grille : avec un nombre impair de capteurs, une grille
+         laisse un emplacement vide en fin de tableau, visible comme un trou
+         noir dans le cadre. Un flux qui revient à la ligne centre sa dernière
+         rangée et le cas disparaît, quel que soit le nombre. */
+      .annonciateur {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: calc(var(--cols) * var(--case) + (var(--cols) - 1) * 12px);
+        gap: 12px;
+        padding: 14px;
+        border-radius: 8px;
+        background: linear-gradient(160deg, #202327 0%, #131518 60%, #191c1f 100%);
+        box-shadow:
+          inset 3px 3px 8px rgba(0, 0, 0, 0.85),
+          inset -2px -2px 4px rgba(255, 255, 255, 0.05),
+          0 0 0 2px #0a0b0c,
+          6px 8px 14px rgba(0, 0, 0, 0.6);
+      }
+      /* Fenêtre à texte gravé, éclairée par l'arrière. Éteinte, la case reste
+         lisible en creux : c'est ce qui fait un annonciateur et non un
+         afficheur, on sait ce que la carte surveille même au repos. */
+      .case {
+        position: relative;
+        flex: none;
+        width: var(--case);
+        height: 74px;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, #2c3034 0%, #1d2124 55%, #16191c 100%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.1),
+          inset 0 -2px 4px rgba(0, 0, 0, 0.6),
+          2px 3px 6px rgba(0, 0, 0, 0.55);
+        overflow: hidden;
+      }
+      /* Les noms d'entité réels dépassent souvent trente caractères. Sans
+         limite de lignes, ils poussent l'état hors de la case ou font déborder
+         la carte : mesuré sur une installation réelle, six noms sur huit
+         étaient rognés. On coupe à deux lignes avec des points de suspension,
+         le nom complet restant dans l'infobulle et dans la fiche de l'entité. */
+      .case b {
+        font-size: var(--police);
+        letter-spacing: 2.4px;
+        text-transform: uppercase;
+        font-weight: 500;
+        padding: 0 6px;
+        text-align: center;
+        line-height: 1.15;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        color: #4e545a;
+        text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(255, 255, 255, 0.06);
+      }
+      .case i {
+        font-style: normal;
+        margin-top: 5px;
+        font-size: 13px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: #3d4247;
+      }
+      .case.on {
+        background: radial-gradient(ellipse at 50% 120%, var(--haut) 0%, var(--bas) 58%, #1a1416 100%);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.22),
+          inset 0 -2px 6px rgba(0, 0, 0, 0.45),
+          2px 3px 6px rgba(0, 0, 0, 0.55),
+          0 0 16px var(--halo);
+      }
+      .case.on b {
+        color: #17120d;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+      .case.on i {
+        color: rgba(23, 18, 13, 0.72);
+      }
+      /* Un ou deux capteurs : la case prend toute la largeur et grossit, au
+         lieu de laisser la moitié du cadre vide. Le nom disparaît en solo, le
+         bandeau de la carte le porte déjà. */
+      .annonciateur.solo .case {
+        height: 150px;
+      }
+      .annonciateur.solo .case i {
+        margin-top: 0;
+        font-size: var(--police);
+        letter-spacing: 4px;
+      }
+      .annonciateur.duo .case {
+        height: 84px;
+      }
+      .annonciateur.duo .case i {
+        font-size: 16px;
+      }
+
+      /* ------------------------------------------------------ 2. voyants */
+
+      .voyants {
+        display: flex;
+        flex-wrap: wrap;
+        width: calc(var(--cols) * var(--col) + (var(--cols) - 1) * var(--gx));
+        gap: var(--gy) var(--gx);
+        justify-content: center;
+        align-items: start;
+      }
+      .voyant {
+        flex: none;
+      }
+      .voyant {
+        width: var(--col);
+        text-align: center;
+      }
+      /* Lunette moletée, même vocabulaire que les molettes du pack. La lumière
+         vient du haut-gauche, le haut de l'anneau capte et le bas retombe. */
+      .lunette {
+        position: relative;
+        width: var(--lentille);
+        height: var(--lentille);
+        margin: 0 auto;
+        border-radius: 50%;
+        background:
+          repeating-conic-gradient(
+            from 0deg,
+            rgba(255, 255, 255, 0.1) 0deg 2deg,
+            rgba(0, 0, 0, 0.16) 2deg 4deg
+          ),
+          linear-gradient(150deg, #9aa0a6 0%, #5b6167 38%, #2c3135 68%, #767c82 100%);
+        box-shadow:
+          inset 0 2px 2px rgba(255, 255, 255, 0.35),
+          inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+          4px 6px 11px rgba(0, 0, 0, 0.65);
+      }
+      /* Verre bombé à facettes : c'est la facette qui distingue un voyant
+         industriel d'une pastille de couleur. */
+      .lentille {
+        position: absolute;
+        inset: 11px;
+        border-radius: 50%;
+        background:
+          repeating-conic-gradient(
+            from 12deg,
+            rgba(255, 255, 255, 0.09) 0deg 9deg,
+            rgba(0, 0, 0, 0.1) 9deg 18deg
+          ),
+          radial-gradient(circle at 38% 30%, var(--haut) 0%, var(--bas) 62%, #0b0d0e 100%);
+        box-shadow:
+          inset 3px 3px 6px rgba(0, 0, 0, 0.55),
+          inset -2px -3px 5px rgba(255, 255, 255, 0.1),
+          0 0 0 1.5px #14171a;
+      }
+      .lentille::after {
+        content: "";
+        position: absolute;
+        left: 16%;
+        top: 10%;
+        width: 40%;
+        height: 30%;
+        border-radius: 50%;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%);
+        filter: blur(1px);
+      }
+      .voyant.on .lunette {
+        box-shadow:
+          inset 0 2px 2px rgba(255, 255, 255, 0.35),
+          inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+          4px 6px 11px rgba(0, 0, 0, 0.65),
+          0 0 22px var(--halo);
+      }
+      .etiquette {
+        margin-top: 12px;
+        font-size: 13px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        color: #9ca0a4;
+        line-height: 1.25;
+        /* Gravure : creux sombre en haut-gauche, arête claire en bas-droite. */
+        text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.85), 1px 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      /* Hauteur figée sur deux lignes : c'est elle qui aligne les rangées et
+         qui empêche un nom à rallonge de pousser la seconde rangée hors de la
+         carte. */
+      .etiquette .nom {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        height: 33px;
+      }
+      .etiquette .etat {
+        display: block;
+      }
+      .voyant.on .etiquette {
+        color: #d7dbdf;
+      }
+      /* En solo l'étiquette passe à côté de la lampe plutôt qu'en dessous : une
+         grosse lentille avec un mot minuscule sous elle déséquilibre la façade. */
+      .voyants.solo {
+        display: flex;
+        align-items: center;
+        gap: 34px;
+      }
+      .voyants.solo .voyant {
+        display: flex;
+        align-items: center;
+        gap: 34px;
+        width: auto;
+      }
+      .voyants.solo .etiquette {
+        margin-top: 0;
+        font-size: 26px;
+        letter-spacing: 3px;
+        text-align: left;
+      }
+      .voyants.duo .etiquette {
+        font-size: 15px;
+      }
+      .voyants.duo .etiquette .nom {
+        height: 38px;
+      }
+
+      /* ------------------------------------------------------- 3. volets */
+
+      .volets {
+        display: flex;
+        flex-wrap: wrap;
+        width: calc(var(--cols) * var(--colonne) + (var(--cols) - 1) * 22px);
+        gap: 14px 22px;
+        justify-content: center;
+        align-items: start;
+      }
+      .colonne {
+        flex: none;
+        width: var(--colonne);
+        text-align: center;
+      }
+      /* Hauteur figée sur deux lignes : sans elle, une étiquette qui passe à la
+         ligne décale son volet et la rangée n'est plus alignée. */
+      .titre-col {
+        font-size: 12px;
+        letter-spacing: 1.6px;
+        text-transform: uppercase;
+        color: #8d9093;
+        margin-bottom: 9px;
+        line-height: 1.2;
+        height: 29px;
+        text-align: center;
+        text-shadow: -1px -1px 0 rgba(0, 0, 0, 0.85);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .volet {
+        position: relative;
+        height: var(--hvolet);
+        border-radius: 5px;
+        font-size: var(--police);
+        line-height: var(--hvolet);
+        letter-spacing: 1.6px;
+        font-weight: 500;
+        color: #edeae2;
+        text-align: center;
+        box-shadow: 4px 5px 9px rgba(0, 0, 0, 0.6);
+      }
+      .volet {
+        perspective: 340px;
+      }
+      .volet .moitie,
+      .volet .rabat {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: calc(var(--hvolet) / 2);
+        overflow: hidden;
+      }
+      .volet .haut,
+      .volet .rabat.h {
+        top: 0;
+        border-radius: 5px 5px 0 0;
+        background: linear-gradient(180deg, #3a3d41 0%, #2a2d31 100%);
+      }
+      .volet .bas,
+      .volet .rabat.b {
+        bottom: 0;
+        border-radius: 0 0 5px 5px;
+        background: linear-gradient(180deg, #202327 0%, #16181b 100%);
+      }
+      .volet .bas span,
+      .volet .rabat.b span {
+        display: block;
+        margin-top: calc(var(--hvolet) / -2);
+      }
+      /* Le rabat tombe, puis le suivant se relève : en deux temps, comme sur un
+         vrai panneau. Les deux faces sont masquées de dos pour ne pas laisser
+         voir le texte à l'envers pendant la rotation. */
+      .volet .rabat {
+        z-index: 3;
+        backface-visibility: hidden;
+      }
+      .volet .rabat.h {
+        transform-origin: bottom;
+      }
+      .volet .rabat.b {
+        transform-origin: top;
+        transform: rotateX(90deg);
+      }
+      .volet.bascule .rabat.h {
+        animation: sk-bin-tombe 0.26s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+      }
+      .volet.bascule .rabat.b {
+        animation: sk-bin-monte 0.26s cubic-bezier(0.1, 0.4, 0.5, 1) 0.26s forwards;
+      }
+      @keyframes sk-bin-tombe {
+        to {
+          transform: rotateX(-90deg);
+        }
+      }
+      @keyframes sk-bin-monte {
+        to {
+          transform: rotateX(0deg);
+        }
+      }
+      .volet .charniere {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(var(--hvolet) / 2 - 1px);
+        height: 1.5px;
+        background: #0a0b0c;
+        z-index: 3;
+      }
+      .volet .axe {
+        position: absolute;
+        top: calc(var(--hvolet) / 2 - 5px);
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        z-index: 4;
+        background: radial-gradient(circle at 35% 30%, #aeb5bb 0%, #61676d 55%, #24282c 100%);
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4), 1px 2px 3px rgba(0, 0, 0, 0.75);
+      }
+      .volet .axe.g {
+        left: -4px;
+      }
+      .volet .axe.d {
+        right: -4px;
+      }
+      .volet.actif span {
+        color: var(--accent-volet);
+        text-shadow: 0 0 10px var(--accent-volet);
+      }
+    `
+];
+SkeuoBinaryCard = __decorateClass([
+  t$2("skeuo-binary-card")
+], SkeuoBinaryCard);
+registerCard({
+  type: "skeuo-binary-card",
+  name: { fr: "Skeuo · Panneau d'états", en: "Skeuo · Status panel" },
+  description: {
+    fr: "États de plusieurs entités sur une seule carte, en annonciateur, voyants ou volets. Portes, fenêtres, mouvement, lumières, prises, présence.",
+    en: "Several entity states on one card, as an annunciator, lamps or split-flaps. Doors, windows, motion, lights, plugs, presence."
+  },
+  preview: true
+});
 console.info(
-  `%c  SKEUO-CARDS  %c  v${"1.1.0"}  `,
+  `%c  SKEUO-CARDS  %c  v${"1.2.0"}  `,
   "color:#141414; font-weight:700; background:#e2a659",
   "color:#e2a659; font-weight:700; background:#141414"
 );
 export {
   SkeuoAlarmCard,
+  SkeuoBinaryCard,
   SkeuoCameraCard,
   SkeuoClimateCard,
+  SkeuoClockCard,
   SkeuoCoverCard,
   SkeuoFanCard,
   SkeuoForecastCard,

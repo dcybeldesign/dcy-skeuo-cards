@@ -56,6 +56,46 @@ const states = {
       device_class: "shutter",
     },
   },
+  "binary_sensor.porte_entree": {
+    entity_id: "binary_sensor.porte_entree", state: "off",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Porte d'entrée", device_class: "door" },
+  },
+  "binary_sensor.fenetre_salon": {
+    entity_id: "binary_sensor.fenetre_salon", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Fenêtre salon", device_class: "window" },
+  },
+  "binary_sensor.mouvement_couloir": {
+    entity_id: "binary_sensor.mouvement_couloir", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Mouvement couloir", device_class: "motion" },
+  },
+  "binary_sensor.fuite_cuisine": {
+    entity_id: "binary_sensor.fuite_cuisine", state: "off",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Fuite cuisine", device_class: "moisture" },
+  },
+  "binary_sensor.porte_garage": {
+    entity_id: "binary_sensor.porte_garage", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Porte garage", device_class: "garage_door" },
+  },
+  "binary_sensor.liaison_box": {
+    entity_id: "binary_sensor.liaison_box", state: "on",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Liaison box", device_class: "connectivity" },
+  },
+  "binary_sensor.presence_bureau": {
+    entity_id: "binary_sensor.presence_bureau", state: "off",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Présence bureau", device_class: "occupancy" },
+  },
+  "binary_sensor.fumee_cuisine": {
+    entity_id: "binary_sensor.fumee_cuisine", state: "off",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Fumée cuisine", device_class: "smoke" },
+  },
   "sensor.humidite": {
     entity_id: "sensor.humidite", state: "58",
     last_changed: "", last_updated: "", context: {},
@@ -218,6 +258,23 @@ const hass = {
   localize: (key) => {
     const map = {
       "ui.card.light.brightness": "Luminosité",
+      // Libellés relevés sur une installation en français, par classe
+      "component.binary_sensor.entity_component.door.state.on": "Ouvert",
+      "component.binary_sensor.entity_component.door.state.off": "Fermé",
+      "component.binary_sensor.entity_component.window.state.on": "Ouvert",
+      "component.binary_sensor.entity_component.window.state.off": "Fermé",
+      "component.binary_sensor.entity_component.garage_door.state.on": "Ouvert",
+      "component.binary_sensor.entity_component.garage_door.state.off": "Fermé",
+      "component.binary_sensor.entity_component.motion.state.on": "Détecté",
+      "component.binary_sensor.entity_component.motion.state.off": "Non détecté",
+      "component.binary_sensor.entity_component.occupancy.state.on": "Détecté",
+      "component.binary_sensor.entity_component.occupancy.state.off": "Non détecté",
+      "component.binary_sensor.entity_component.moisture.state.on": "Humide",
+      "component.binary_sensor.entity_component.moisture.state.off": "Sec",
+      "component.binary_sensor.entity_component.connectivity.state.on": "Connecté",
+      "component.binary_sensor.entity_component.connectivity.state.off": "Déconnecté",
+      "component.binary_sensor.entity_component.smoke.state.on": "Détectée",
+      "component.binary_sensor.entity_component.smoke.state.off": "Non détectée",
       "ui.card.cover.open_cover": "Ouvrir",
       "ui.card.cover.close_cover": "Fermer",
       "ui.card.cover.stop_cover": "Arrêter",
@@ -307,8 +364,12 @@ const hass = {
     }
     if (unit) return `${s.state} ${unit}`;
     const domain = s.entity_id.split(".")[0];
-    const key = `component.${domain}.entity_component._.state.${s.state}`;
-    return hass.localize(key) || s.state;
+    // Le libellé propre à la classe d'abord, puis le générique du domaine.
+    const classe = s.attributes.device_class;
+    const cles = [`component.${domain}.entity_component._.state.${s.state}`];
+    if (classe) cles.unshift(`component.${domain}.entity_component.${classe}.state.${s.state}`);
+    for (const key of cles) if (hass.localize(key)) return hass.localize(key);
+    return s.state;
   },
   formatEntityAttributeValue: (s, attribut) => {
     const valeur = Number(s.attributes[attribut]);
@@ -398,10 +459,27 @@ const CARTES = [
   ["skeuo-forecast-card", { entity: "weather.exterieur", subtitle: "Prévisions 5 jours" }],
   ["skeuo-media-card", { entity: "media_player.salon", subtitle: "MPD · Bluetooth" }],
   ["skeuo-camera-card", { entity: "camera.entree", subtitle: "Vidéosurveillance" }],
+  ["skeuo-clock-card", { style: "lcd", subtitle: "Écran LCD" }],
+  ["skeuo-clock-card", { style: "analog", subtitle: "Aiguilles" }],
+  ["skeuo-clock-card", { style: "nixie", subtitle: "Tubes Nixie" }],
+  ["skeuo-clock-card", { style: "flap", subtitle: "Volets basculants" }],
+  ["skeuo-clock-card", { style: "words", subtitle: "Matrice de mots" }],
+  ["skeuo-binary-card", { style: "annunciator", subtitle: "Annonciateur", entities: ["binary_sensor.porte_entree", "binary_sensor.fenetre_salon", "binary_sensor.mouvement_couloir", "binary_sensor.fuite_cuisine"] }],
+  ["skeuo-binary-card", { style: "lamp", subtitle: "Voyants", entities: ["binary_sensor.porte_entree", "binary_sensor.fenetre_salon", "binary_sensor.mouvement_couloir", "binary_sensor.fuite_cuisine"] }],
+  ["skeuo-binary-card", { style: "flap", subtitle: "Volets", entities: ["binary_sensor.porte_entree", "binary_sensor.fenetre_salon", "binary_sensor.mouvement_couloir", "binary_sensor.fuite_cuisine"] }],
+  ["skeuo-binary-card", { style: "annunciator", subtitle: "Annonciateur, huit capteurs", entities: ["binary_sensor.porte_entree", "binary_sensor.fenetre_salon", "binary_sensor.mouvement_couloir", "binary_sensor.fuite_cuisine", "binary_sensor.porte_garage", "binary_sensor.liaison_box", "binary_sensor.presence_bureau", "binary_sensor.fumee_cuisine"] }],
+  ["skeuo-binary-card", { style: "lamp", subtitle: "Voyants, huit capteurs", entities: ["binary_sensor.porte_entree", "binary_sensor.fenetre_salon", "binary_sensor.mouvement_couloir", "binary_sensor.fuite_cuisine", "binary_sensor.porte_garage", "binary_sensor.liaison_box", "binary_sensor.presence_bureau", "binary_sensor.fumee_cuisine"] }],
 ];
 
+// `?planche` ne garde que la première carte de chaque sorte : c'est la page
+// capturée pour docs/apercu.png, une carte par type et dans l'ordre du README.
+const vus = new Set();
+const liste = new URLSearchParams(location.search).has("planche")
+  ? CARTES.filter(([type]) => !vus.has(type) && vus.add(type))
+  : CARTES;
+
 const mounted = [];
-for (const [type, config] of CARTES) {
+for (const [type, config] of liste) {
   const cell = document.createElement("div");
   cell.className = "cell";
   const el = document.createElement(type);

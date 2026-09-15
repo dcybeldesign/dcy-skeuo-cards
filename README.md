@@ -2,9 +2,9 @@
 
 A pack of skeuomorphic Lovelace cards for Home Assistant: carbon fibre fascia, machined metal knobs, recessed-rail faders, amber LCD screens.
 
-![Preview of the fourteen cards](docs/apercu.png)
+![Preview of the sixteen cards](docs/apercu.png)
 
-The fourteen cards of the project, built on a shared component library: light, climate, cover, sensor, smart plug, lock, fan, water heater, robot vacuum, alarm, weather, forecast, media player, camera.
+The sixteen cards of the project, built on a shared component library: light, climate, cover, sensor, smart plug, lock, fan, water heater, robot vacuum, alarm, weather, forecast, media player, camera, clock, status panel.
 
 **[Try the cards in your browser](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, nothing to install. Three of them run on simulated entities, with the material, the grain, the accent and the layout switchable.
 
@@ -12,13 +12,13 @@ The fourteen cards of the project, built on a shared component library: light, c
 
 ## What it does
 
-Every card drives a real entity and calls the matching Home Assistant services. The controls are real controls: the knob takes pointer or keyboard input, the faders are rotated `input[type=range]` elements that keep native touch and ARIA semantics, the buttons are `<button>` elements.
+Every card except the clock follows real entities, and the ones that drive a device call the matching Home Assistant services. The controls are real controls: the knob takes pointer or keyboard input, the faders are rotated `input[type=range]` elements that keep native touch and ARIA semantics, the buttons are `<button>` elements.
 
 Four choices shape the pack.
 
 **Uniform scale factor.** The design is drawn at a fixed reference height of 310 px, then brought down to the real cell size by a `transform: scale()` computed from a `ResizeObserver`. Everything, text included, keeps exactly the same proportions at any size: nothing ever gets truncated. The width of the plane, on the other hand, stretches to fill wide sections instead of leaving two empty bands.
 
-**No bitmap images.** Textures, knob, screws, screens and the sixteen weather icons are produced in CSS and SVG, all drawn for this pack, with no external icon set. The bundle is 252 kB (63 kB gzipped), and the rendering stays crisp at any display size, which a photograph could not do.
+**No bitmap images.** Textures, knob, screws, screens and the sixteen weather icons are produced in CSS and SVG, all drawn for this pack, with no external icon set. The bundle is 316 kB (78 kB gzipped), and the rendering stays crisp at any display size, which a photograph could not do.
 
 **Smoothed motion.** No value jumps from one point to another: cover position, thermostat and water heater setpoints, fan speed, player volume, knob brightness and VU meter needles reach their target by accelerating then decelerating. The value itself is interpolated frame by frame, which leaves the native controls in place and absorbs the steps an appliance reports while it is moving. A user gesture is never animated, and `prefers-reduced-motion` removes everything.
 
@@ -272,6 +272,58 @@ Nothing is requested from the camera in the picker thumbnail or in the editor pr
 
 The Motion button calls `camera.enable_motion_detection` and its opposite, and stays inert on a camera that does not publish the `motion_detection` attribute. The Record button calls `camera.record`, which requires a destination path: without `record_filename` it stays inert too, having nowhere to write.
 
+### Clock
+
+```yaml
+type: custom:skeuo-clock-card
+style: nixie
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `style` | `lcd` | `lcd`, `analog`, `nixie`, `flap` or `words` |
+| `blink` | `false` | Blinking colon between hours and minutes |
+
+The clock follows no entity: the time comes from the browser. A timestamp sensor changes state every minute and would wake every card that tracks it, which is exactly what the render filter of the pack avoids, and on a wall screen the time that matters is the one of that screen. The `entity` option does not exist on this card.
+
+Five styles share the same card rather than five entries in the picker: an amber LCD with the date, hands with a seconds hand, Nixie tubes, split-flap modules that fall when a digit changes, and a word matrix that spells the time in French or in English, following the language of Home Assistant. Day and month names go through `Intl` in the language of Home Assistant, so they are not limited to the two languages of the pack.
+
+The card only redraws when its picture changes. The LCD, Nixie, split-flap and word styles repaint once a minute; the hands beat the second, and so does the colon when `blink` is on. The colon stays still by default: on a screen that is always in view, a blink draws the eye without saying anything.
+
+### Status panel
+
+```yaml
+type: custom:skeuo-binary-card
+style: annunciator
+entities:
+  - binary_sensor.front_door
+  - binary_sensor.living_room_window
+  - entity: binary_sensor.internet
+    invert: true
+  - entity: binary_sensor.garage_door
+    color: red
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `entities` | required | Entities shown, in display order |
+| `style` | `annunciator` | `annunciator`, `lamp` or `flap` |
+
+Per entity, in YAML:
+
+| Option | Default | Purpose |
+|---|---|---|
+| `color` | from the `device_class` | `red` or `amber` |
+| `invert` | `false` | Light the indicator on `off` instead of `on` |
+
+The panel acts on nothing, it shows states. It accepts any entity with a two-state reading: binary sensors, lights, switches, input booleans, fans, locks, covers, people, device trackers, automations, media players and the sun. An indicator lights for any state other than `off`, `closed`, `locked`, `idle`, `unavailable` and `unknown`: a cover `open`, a lock `unlocked`, a player `playing`. People and device trackers only light at `home`, and the sun only above the horizon. The label under each indicator is the state as Home Assistant words it.
+
+The tint comes from the `device_class`. Red is kept for a short list of real alarms: `smoke`, `gas`, `carbon_monoxide`, `safety`, `tamper`, `problem`, `moisture` and `heat`. Everything else takes the amber of the pack. A red spread widely stops meaning anything: if an open window and a starting fire wear the same colour, the panel shouts all the time and people stop looking at it.
+
+`invert` exists for classes whose worrying state is `off`: a `connectivity` sensor alerts when the link drops, not while it holds. The card never inverts on its own, which would surprise anyone who knows how Home Assistant defines these states. The editor sets the list and the style; `color` and `invert` are YAML only, since a multiple entity picker cannot carry options per line.
+
+The layout follows the count. A single entity gets a large indicator and gives its name to the card title, as on the other cards; two get medium indicators; from three on, the panel layout takes over and its last row is centred. Beyond eight entities the panel gets cramped. Long names wrap on two lines, and the full name stays in the tooltip. Each indicator opens its entity dialog, with the keyboard too. An unreachable entity desaturates in place instead of disappearing, so the panel keeps its shape when a battery dies.
+
 ## States
 
 ![State comparison](docs/etats.png)
@@ -286,7 +338,7 @@ States that are not an off state are not greyed out: a closed cover or a sensor 
 
 | Option | Default | Purpose |
 |---|---|---|
-| `entity` | required | Driven entity |
+| `entity` | required | Driven entity. The clock has none, the status panel takes `entities` |
 | `name` | `friendly_name` | Module title |
 | `subtitle` | empty | Line under the title |
 | `material` | `carbon` | `carbon`, `graphite`, `brushed` or `none` |
@@ -369,6 +421,7 @@ In a cell too narrow for the nominal width, the scale factor switches to the wid
 ## Known limits
 
 - The camera card shows a refreshed snapshot, not a continuous stream. See the section devoted to it.
+- The digital styles of the clock always use the 24-hour format, whatever time format is set in Home Assistant.
 - Locks and alarm panels that require a code cannot be driven from the card: the button opens the entity dialog, which knows how to present the keypad. Putting the code in the dashboard configuration would mean writing it in clear text in a YAML file that gets backed up and synchronised.
 - The pack imposes its own skin and does not follow the colours of the active theme, by design. It does respect `--ha-card-border-radius` and `prefers-reduced-motion`.
 - The design is meant for a wall tablet and a desktop dashboard. Below roughly 300 px wide, the content stays readable but becomes small.

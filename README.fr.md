@@ -2,9 +2,9 @@
 
 Pack de cartes Lovelace skeuomorphiques pour Home Assistant : façade carbone, molettes en métal usiné, faders à rail creusé, écrans LCD ambre.
 
-![Aperçu des quatorze cartes](docs/apercu.png)
+![Aperçu des seize cartes](docs/apercu.png)
 
-Les quatorze cartes du projet, construites sur une bibliothèque de composants commune : lumière, climatisation, volet roulant, capteur, prise connectée, serrure, ventilateur, chauffe-eau, aspirateur robot, alarme, météo, prévisions, multimédia, caméra.
+Les seize cartes du projet, construites sur une bibliothèque de composants commune : lumière, climatisation, volet roulant, capteur, prise connectée, serrure, ventilateur, chauffe-eau, aspirateur robot, alarme, météo, prévisions, multimédia, caméra, horloge, panneau d'états.
 
 **[Essayer les cartes dans votre navigateur](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, sans rien installer. Trois d'entre elles tournent sur des entités simulées, avec la matière, le grain, l'accent et la disposition réglables.
 
@@ -12,13 +12,13 @@ Les quatorze cartes du projet, construites sur une bibliothèque de composants c
 
 ## Ce que ça fait
 
-Chaque carte pilote une entité réelle et appelle les services Home Assistant correspondants. Les contrôles sont des vrais contrôles : la molette se prend au pointeur ou au clavier, les faders sont des `input[type=range]` pivotés qui gardent le tactile et la sémantique ARIA natifs, les boutons sont des `<button>`.
+Chaque carte sauf l'horloge suit des entités réelles, et celles qui pilotent un appareil appellent les services Home Assistant correspondants. Les contrôles sont des vrais contrôles : la molette se prend au pointeur ou au clavier, les faders sont des `input[type=range]` pivotés qui gardent le tactile et la sémantique ARIA natifs, les boutons sont des `<button>`.
 
 Quatre choix structurent le pack.
 
 **Mise à l'échelle par facteur uniforme.** Le design est dessiné à une hauteur de référence fixe de 310 px, puis ramené à la taille réelle de la cellule par un `transform: scale()` calculé au `ResizeObserver`. Tout, texte compris, garde exactement les mêmes proportions à n'importe quelle taille : rien ne se tronque jamais. La largeur du plan, elle, s'étire pour remplir les sections larges au lieu de laisser deux bandes vides.
 
-**Aucune image bitmap.** Textures, molette, vis, écrans et les seize icônes météo sont produits en CSS et en SVG, tous dessinés pour ce pack, sans jeu d'icônes extérieur. Le bundle fait 252 ko (63 ko en gzip), et le rendu reste net quelle que soit la taille d'affichage, ce qu'une photo ne permettrait pas.
+**Aucune image bitmap.** Textures, molette, vis, écrans et les seize icônes météo sont produits en CSS et en SVG, tous dessinés pour ce pack, sans jeu d'icônes extérieur. Le bundle fait 316 ko (78 ko en gzip), et le rendu reste net quelle que soit la taille d'affichage, ce qu'une photo ne permettrait pas.
 
 **Mouvement lissé.** Aucune valeur ne saute d'un point à l'autre : position du volet, consigne du thermostat et du chauffe-eau, vitesse du ventilateur, volume du lecteur, intensité de la molette et aiguille des VU-mètres rejoignent leur cible en accélérant puis en ralentissant. La valeur elle-même est interpolée image par image, ce qui laisse les contrôles natifs en place, et absorbe au passage les paliers que remonte un appareil en cours de course. Un geste de l'utilisateur n'est jamais animé, et `prefers-reduced-motion` supprime tout.
 
@@ -272,6 +272,58 @@ Rien n'est demandé à la caméra dans la vignette du sélecteur ni dans l'aper�
 
 Le bouton Détection appelle `camera.enable_motion_detection` et son inverse, et reste inerte sur une caméra qui ne publie pas l'attribut `motion_detection`. Le bouton Enregistrement appelle `camera.record`, qui exige un chemin de destination : sans `record_filename`, il reste inerte lui aussi, faute de savoir où écrire.
 
+### Horloge
+
+```yaml
+type: custom:skeuo-clock-card
+style: nixie
+```
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `style` | `lcd` | `lcd`, `analog`, `nixie`, `flap` ou `words` |
+| `blink` | `false` | Deux-points clignotants entre heures et minutes |
+
+L'horloge ne suit aucune entité : l'heure vient du navigateur. Un capteur d'horodatage change d'état toutes les minutes et réveillerait toutes les cartes qui le suivent, exactement ce que le filtre de rendu du pack cherche à éviter, et sur un écran mural l'heure qui compte est celle de cet écran. L'option `entity` n'existe pas sur cette carte.
+
+Cinq styles partagent la même carte plutôt que cinq entrées dans le sélecteur : un écran LCD ambré avec la date, des aiguilles avec trotteuse, des tubes Nixie, des volets basculants qui tombent quand un chiffre change, et une matrice de mots qui écrit l'heure en français ou en anglais selon la langue de Home Assistant. Les noms de jour et de mois passent par `Intl` dans la langue de Home Assistant, ils ne se limitent donc pas aux deux langues du pack.
+
+La carte ne se redessine que si son image change. Les styles LCD, Nixie, volets et mots repeignent une fois par minute ; les aiguilles battent la seconde, comme les deux-points quand `blink` est actif. Ils restent fixes par défaut : sur un écran en permanence dans le champ, un clignotement attire l'œil sans rien dire.
+
+### Panneau d'états
+
+```yaml
+type: custom:skeuo-binary-card
+style: annunciator
+entities:
+  - binary_sensor.porte_entree
+  - binary_sensor.fenetre_salon
+  - entity: binary_sensor.liaison_box
+    invert: true
+  - entity: binary_sensor.porte_garage
+    color: red
+```
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `entities` | requis | Entités affichées, dans l'ordre d'affichage |
+| `style` | `annunciator` | `annunciator`, `lamp` ou `flap` |
+
+Par entité, en YAML :
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `color` | selon la `device_class` | `red` ou `amber` |
+| `invert` | `false` | Allume le voyant sur `off` au lieu de `on` |
+
+Le panneau n'agit sur rien, il affiche des états. Il accepte toute entité qui se lit en deux états : capteurs binaires, lumières, interrupteurs, `input_boolean`, ventilateurs, serrures, volets, personnes, appareils suivis, automatisations, lecteurs multimédias et soleil. Un voyant s'allume pour tout état autre que `off`, `closed`, `locked`, `idle`, `unavailable` et `unknown` : un volet `open`, une serrure `unlocked`, un lecteur `playing`. Les personnes et les appareils suivis ne s'allument qu'à `home`, et le soleil seulement quand il est levé. Le libellé sous chaque voyant est l'état tel que Home Assistant le formule.
+
+La teinte vient de la `device_class`. Le rouge est réservé à une liste courte de vraies alarmes : `smoke`, `gas`, `carbon_monoxide`, `safety`, `tamper`, `problem`, `moisture` et `heat`. Tout le reste prend l'ambre du pack. Un rouge distribué largement ne veut plus rien dire : si une fenêtre ouverte et un début d'incendie portent la même couleur, le panneau crie en permanence et on cesse de le regarder.
+
+`invert` sert aux classes dont l'état inquiétant est `off` : un capteur `connectivity` alerte quand la liaison tombe, pas quand elle tient. La carte n'inverse jamais d'elle-même, ce qui surprendrait quiconque connaît la façon dont Home Assistant définit ces états. L'éditeur règle la liste et le style ; `color` et `invert` se posent en YAML, un sélecteur d'entités multiple ne sachant pas porter d'options par ligne.
+
+La mise en page suit le nombre. Une entité seule a un grand voyant et donne son nom au titre de la carte, comme sur les autres cartes ; deux ont des voyants intermédiaires ; à partir de trois, la disposition en panneau prend la main et sa dernière rangée est centrée. Au-delà de huit entités, le panneau devient serré. Les noms longs passent sur deux lignes et le nom complet reste dans l'infobulle. Chaque voyant ouvre la fiche de son entité, au clavier aussi. Une entité injoignable se désature sur place au lieu de disparaître, pour que le panneau garde sa forme quand une pile meurt.
+
 ## États
 
 ![Comparaison des états](docs/etats.png)
@@ -286,7 +338,7 @@ Les états qui ne sont pas un arrêt ne sont pas grisés : un volet fermé ou un
 
 | Option | Défaut | Rôle |
 |---|---|---|
-| `entity` | requis | Entité pilotée |
+| `entity` | requis | Entité pilotée. L'horloge n'en a pas, le panneau d'états prend `entities` |
 | `name` | `friendly_name` | Titre du module |
 | `subtitle` | vide | Ligne sous le titre |
 | `material` | `carbon` | `carbon`, `graphite`, `brushed` ou `none` |
@@ -369,6 +421,7 @@ Dans une cellule trop étroite pour la largeur nominale, le facteur d'échelle b
 ## Limites connues
 
 - La carte caméra montre un instantané rafraîchi, pas un flux continu. Voir la section qui lui est consacrée.
+- Les styles numériques de l'horloge affichent toujours l'heure sur 24 heures, quel que soit le format réglé dans Home Assistant.
 - Les serrures et les centrales d'alarme qui exigent un code ne se pilotent pas depuis la carte : le bouton ouvre la fiche de l'entité, qui sait présenter le pavé de saisie. Mettre le code dans la configuration du tableau de bord reviendrait à l'écrire en clair dans un fichier YAML sauvegardé et synchronisé.
 - Le pack impose son propre habillage et ne suit pas les couleurs du thème actif, par construction. Il respecte en revanche `--ha-card-border-radius` et `prefers-reduced-motion`.
 - Le design est pensé pour une tablette murale et un dashboard de bureau. En dessous d'environ 300 px de large, le contenu reste lisible mais devient petit.
