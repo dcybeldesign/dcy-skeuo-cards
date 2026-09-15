@@ -563,11 +563,21 @@ export class SkeuoClockCard extends SkeuoBaseCard<ClockCardConfig> {
       `;
     };
 
+    // Deux-points : quand il clignote, ses deux mini-modules basculent à chaque
+    // seconde comme les chiffres, au lieu de s'allumer et s'éteindre sur place.
+    // L'état alterne à chaque battement et chaque état a son propre nom
+    // d'animation : c'est ce changement de nom qui relance la bascule, sans le
+    // rendu supplémentaire qu'il faut aux chiffres pour retirer leur classe.
     const visible = this._pointVisible();
+    const bat = this._config?.blink === true;
+    const avantPoint = bat ? !visible : visible;
+    const point = (plein: boolean) => (plein ? "plein" : "");
     const mini = () => html`
-      <div class="mini">
-        <div class="m h"><span class=${visible ? "plein" : ""}></span></div>
-        <div class="m b"><span class=${visible ? "plein" : ""}></span></div>
+      <div class=${classMap({ mini: true, tic: bat && visible, tac: bat && !visible })}>
+        <div class="m h"><span class=${point(visible)}></span></div>
+        <div class="m b"><span class=${point(avantPoint)}></span></div>
+        <div class="r h"><span class=${point(avantPoint)}></span></div>
+        <div class="r b"><span class=${point(visible)}></span></div>
         <div class="ch"></div>
       </div>
     `;
@@ -1201,6 +1211,70 @@ export class SkeuoClockCard extends SkeuoBaseCard<ClockCardConfig> {
         height: 1.5px;
         background: #0a0b0c;
         z-index: 4;
+      }
+      /* Rabats du deux-points, sur le modèle des chiffres et avec leurs durées.
+         Deux jeux d'images clés identiques, tic et tac : l'état alterne à chaque
+         seconde, et c'est le changement de nom d'animation qui relance la
+         bascule. Hors clignotement, le rabat du bas reste replié et invisible. */
+      .mini {
+        perspective: 120px;
+      }
+      .mini .r {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 16px;
+        overflow: hidden;
+        z-index: 3;
+        backface-visibility: hidden;
+      }
+      .mini .r.h {
+        top: 0;
+        border-radius: 3px 3px 0 0;
+        background: linear-gradient(180deg, #3a3d41 0%, #2a2d31 100%);
+        transform-origin: bottom;
+      }
+      .mini .r.b {
+        bottom: 0;
+        border-radius: 0 0 3px 3px;
+        background: linear-gradient(180deg, #202327 0%, #16181b 100%);
+        transform-origin: top;
+        transform: rotateX(90deg);
+      }
+      .mini .r.b span {
+        margin-top: -16px;
+      }
+      .mini.tic .r.h {
+        animation: sk-tombe-tic 0.26s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+      }
+      .mini.tic .r.b {
+        animation: sk-monte-tic 0.26s cubic-bezier(0.1, 0.4, 0.5, 1) 0.26s forwards;
+      }
+      .mini.tac .r.h {
+        animation: sk-tombe-tac 0.26s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+      }
+      .mini.tac .r.b {
+        animation: sk-monte-tac 0.26s cubic-bezier(0.1, 0.4, 0.5, 1) 0.26s forwards;
+      }
+      @keyframes sk-tombe-tic {
+        to {
+          transform: rotateX(-90deg);
+        }
+      }
+      @keyframes sk-tombe-tac {
+        to {
+          transform: rotateX(-90deg);
+        }
+      }
+      @keyframes sk-monte-tic {
+        to {
+          transform: rotateX(0deg);
+        }
+      }
+      @keyframes sk-monte-tac {
+        to {
+          transform: rotateX(0deg);
+        }
       }
       .bandeau {
         margin-top: 10px;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+- The split-flap colon now flips like the digits when `blink` is on,
+  instead of switching its dots on and off in place. It costs no extra
+  redraw: each beat already repaints the card, and changing the animation
+  name restarts the flip on its own.
+
 ## 1.2.0
 - Two new cards, which brings the pack to sixteen. The clock reads the time
   from the browser and follows no entity, in five styles: amber LCD, hands,
