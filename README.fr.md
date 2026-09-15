@@ -6,7 +6,7 @@ Pack de cartes Lovelace skeuomorphiques pour Home Assistant : façade carbone, m
 
 Les seize cartes du projet, construites sur une bibliothèque de composants commune : lumière, climatisation, volet roulant, capteur, prise connectée, serrure, ventilateur, chauffe-eau, aspirateur robot, alarme, météo, prévisions, multimédia, caméra, horloge, panneau d'états.
 
-**[Essayer les cartes dans votre navigateur](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, sans rien installer. Trois d'entre elles tournent sur des entités simulées, avec la matière, le grain, l'accent et la disposition réglables.
+**[Essayer les cartes dans votre navigateur](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, sans rien installer. Trois d'entre elles tournent sur des entités simulées, avec la matière, le grain, l'accent et la disposition réglables. L'horloge a **[sa propre démo](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/clock/)**, avec ses cinq styles côte à côte.
 
 *[Read this in English](README.md)*
 

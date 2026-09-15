@@ -6,7 +6,7 @@ A pack of skeuomorphic Lovelace cards for Home Assistant: carbon fibre fascia, m
 
 The sixteen cards of the project, built on a shared component library: light, climate, cover, sensor, smart plug, lock, fan, water heater, robot vacuum, alarm, weather, forecast, media player, camera, clock, status panel.
 
-**[Try the cards in your browser](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, nothing to install. Three of them run on simulated entities, with the material, the grain, the accent and the layout switchable.
+**[Try the cards in your browser](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/)**, nothing to install. Three of them run on simulated entities, with the material, the grain, the accent and the layout switchable. The clock has **[its own demo](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/clock/)**, with its five styles side by side.
 
 *[Lire en français](README.fr.md)*
 
