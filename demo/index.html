@@ -57,6 +57,10 @@
     padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
   }
   .seg button[aria-pressed="true"] { background: var(--amber); color: #1a1206; font-weight: 600; }
+  /* Réglage sans effet dans l'état courant : grisé plutôt que caché, pour qu'on
+     sache qu'il existe. L'infobulle dit quand il s'active. */
+  .fld.off > label, .fld.off > input { opacity: .45; }
+  .fld.off > input { cursor: not-allowed; }
 
   .grid { display: flex; flex-wrap: wrap; gap: 26px; }
   .slot { display: flex; flex-direction: column; gap: 9px; }
@@ -64,6 +68,10 @@
      sur la largeur utile et les hauteurs affichées ne tomberaient plus sur
      celles d'un vrai dashboard. */
   .cell { outline: 1px dashed #35373d; border-radius: 4px; }
+  /* Fond clair : seule la cellule change, la page garde ses couleurs. C'est le
+     cas le plus dur pour material: none, dont les étiquettes n'ont plus de
+     façade sombre sous elles. */
+  body.clair .cell { background: #dcdee3; outline-color: #9aa0a8; }
   /* Les deux dispositions de Home Assistant, reproduites telles quelles.
      Sections impose une hauteur à la cellule et étire la carte dedans, ce qui
      neutralise l'aspect-ratio que la carte porte elle-même. Masonry ne donne
@@ -118,12 +126,20 @@
   </div>
 
   <div class="fld">
-    <label for="material" data-t="material"></label>
-    <select id="material">
-      <option value="carbon">carbon</option>
-      <option value="graphite">graphite</option>
-      <option value="brushed">brushed metal</option>
-    </select>
+    <label data-t="material"></label>
+    <!-- Des boutons et non un menu déroulant : un menu cache ses options tant
+         qu'on ne l'ouvre pas, et les quatre matières doivent se voir d'emblée. -->
+    <div class="seg" id="material">
+      <button type="button" data-material="carbon" aria-pressed="true" data-t="m_carbon"></button>
+      <button type="button" data-material="graphite" aria-pressed="false" data-t="m_graphite"></button>
+      <button type="button" data-material="brushed" aria-pressed="false" data-t="m_brushed"></button>
+      <button type="button" data-material="none" aria-pressed="false" data-t="m_none"></button>
+    </div>
+  </div>
+
+  <div class="fld off" id="clairFld">
+    <label for="clair" data-t="clair"></label>
+    <input id="clair" type="checkbox" disabled>
   </div>
 
   <div class="fld">
@@ -230,9 +246,11 @@ try {
 const UI = {
   en: {
     title: "live demo",
-    lede: "Two of the fourteen cards, running in this page. Nothing is connected to a Home Assistant: the entities are simulated here, but the cards are the real ones from the pack, unmodified. Drag the volume fader, turn the setpoint dial, press the transport buttons.",
+    lede: "Three of the sixteen cards, running in this page. Nothing is connected to a Home Assistant: the entities are simulated here, but the cards are the real ones from the pack, unmodified. Drag the volume fader, turn the setpoint dial, press the transport buttons.",
     lang: "Language", material: "Material", grain: "Grain", accent: "Accent",
     screws: "Screws", width: "Cell width", height: "Grid rows",
+    clair: "Light background", clairTip: "Only with No fascia: the other materials cover the cell.",
+    m_carbon: "Carbon", m_graphite: "Graphite", m_brushed: "Brushed metal", m_none: "No fascia",
     layout: "Layout", masonry: "Masonry", sections: "Sections",
     derived: "Card height", derivedSuffix: "derived",
     watts: "Meter reading",
@@ -245,13 +263,15 @@ const UI = {
     n2p: "Drag the meter reading from one end to the other and release. The needle does not jump, it accelerates and settles, because the value itself is interpolated frame by frame rather than the pixels. A device that reports its position in coarse steps still reads as one continuous move. Your own gesture on a fader is never animated, only what comes back from the entity.",
     n3h: "Redraw filter",
     n3p: "An unrelated entity is changing state twice a second in the background. The counters under each card do not move, because a card only repaints when one of its own entities, the theme, the language or the connection changes.",
-    foot: 'Everything on this page is drawn in CSS and SVG. No bitmap, no icon set, 59 kB gzipped for the whole pack. Source and installation: <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+    foot: 'Everything on this page is drawn in CSS and SVG. No bitmap, no icon set, 78 kB gzipped for the whole pack. Source and installation: <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
   },
   fr: {
     title: "démo interactive",
-    lede: "Deux des quatorze cartes, qui tournent dans cette page. Rien n'est relié à un Home Assistant : les entités sont simulées ici, mais les cartes sont bien celles du pack, sans modification. Faites glisser le fader de volume, tournez le bouton de consigne, appuyez sur les touches de transport.",
+    lede: "Trois des seize cartes, qui tournent dans cette page. Rien n'est relié à un Home Assistant : les entités sont simulées ici, mais les cartes sont bien celles du pack, sans modification. Faites glisser le fader de volume, tournez le bouton de consigne, appuyez sur les touches de transport.",
     lang: "Langue", material: "Matière", grain: "Grain", accent: "Accent",
     screws: "Vis", width: "Largeur cellule", height: "Lignes de grille",
+    clair: "Fond clair", clairTip: "Seulement sans façade : les autres matières couvrent la cellule.",
+    m_carbon: "Carbone", m_graphite: "Graphite", m_brushed: "Métal brossé", m_none: "Sans façade",
     layout: "Disposition", masonry: "Masonry", sections: "Sections",
     derived: "Hauteur de carte", derivedSuffix: "déduite",
     watts: "Valeur mesurée",
@@ -264,7 +284,7 @@ const UI = {
     n2p: "Faites glisser la valeur mesurée d'un bout à l'autre, puis relâchez. L'aiguille ne saute pas, elle accélère et vient se poser, parce que c'est la valeur elle-même qui est interpolée image par image et pas les pixels. Un appareil qui annonce sa position par paliers grossiers se lit quand même comme un mouvement continu. Votre propre geste sur un fader, lui, n'est jamais animé : seul ce qui revient de l'entité l'est.",
     n3h: "Filtre de rendu",
     n3p: "Une entité sans rapport change d'état deux fois par seconde en arrière-plan. Les compteurs sous les cartes ne bougent pas, parce qu'une carte ne se redessine que si l'une de ses propres entités, le thème, la langue ou la connexion a changé.",
-    foot: 'Tout ce que vous voyez est dessiné en CSS et SVG. Aucun bitmap, aucun jeu d\'icônes, 59 ko gzippés pour le pack entier. Source et installation : <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+    foot: 'Tout ce que vous voyez est dessiné en CSS et SVG. Aucun bitmap, aucun jeu d\'icônes, 78 ko gzippés pour le pack entier. Source et installation : <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
   },
 };
 
@@ -574,6 +594,27 @@ function appliquerTextes() {
     c.cnt.textContent = `${c.rendus} ${d.redraws}`;
   }
   document.documentElement.lang = lang;
+  appliquerMateriau();
+}
+
+/**
+ * Boutons de matière et case du fond clair. Le fond clair n'a de sens que sans
+ * façade : avec une matière, la carte couvre la cellule et la case ne produirait
+ * qu'une bordure grise. Elle reste visible mais grisée, et se décoche quand on
+ * revient à une matière.
+ */
+function appliquerMateriau() {
+  for (const b of document.querySelectorAll("#material button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.material === reglages.material));
+  }
+  const sansFacade = reglages.material === "none";
+  $("clair").disabled = !sansFacade;
+  if (!sansFacade && $("clair").checked) {
+    $("clair").checked = false;
+    document.body.classList.remove("clair");
+  }
+  $("clairFld").classList.toggle("off", !sansFacade);
+  $("clairFld").title = sansFacade ? "" : UI[lang].clairTip;
 }
 
 // Le filtre de rendu des cartes compare les références de themes, locale et
@@ -587,7 +628,13 @@ function push() {
   for (const c of mounted) c.el.hass = suivant;
 }
 
-$("material").addEventListener("change", (e) => { reglages.material = e.target.value; appliquerConfig(); });
+$("material").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.material === reglages.material) return;
+  reglages.material = b.dataset.material;
+  appliquerMateriau();
+  appliquerConfig();
+});
 $("texture").addEventListener("input", (e) => {
   reglages.texture = Number(e.target.value);
   $("textureVal").textContent = `${e.target.value} %`;
@@ -595,6 +642,7 @@ $("texture").addEventListener("input", (e) => {
 });
 $("accent").addEventListener("input", (e) => { reglages.accent = e.target.value; appliquerConfig(); });
 $("screws").addEventListener("change", (e) => { reglages.screws = e.target.checked; appliquerConfig(); });
+$("clair").addEventListener("change", (e) => { document.body.classList.toggle("clair", e.target.checked); });
 // L'aiguille est amortie : elle se voit sur un saut, pas sur un suivi continu.
 // La valeur n'est donc envoyée qu'au relâchement, le curseur affiche la
 // destination pendant qu'on le déplace.
