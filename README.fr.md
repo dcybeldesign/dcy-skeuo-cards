@@ -284,11 +284,13 @@ style: nixie
 | `style` | `lcd` | `lcd`, `analog`, `nixie`, `flap` ou `words` |
 | `blink` | `false` | Deux-points clignotants entre heures et minutes |
 
+**[Essayer les cinq styles dans votre navigateur](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/clock/)**, sans rien installer.
+
 L'horloge ne suit aucune entité : l'heure vient du navigateur. Un capteur d'horodatage change d'état toutes les minutes et réveillerait toutes les cartes qui le suivent, exactement ce que le filtre de rendu du pack cherche à éviter, et sur un écran mural l'heure qui compte est celle de cet écran. L'option `entity` n'existe pas sur cette carte.
 
 Cinq styles partagent la même carte plutôt que cinq entrées dans le sélecteur : un écran LCD ambré avec la date, des aiguilles avec trotteuse, des tubes Nixie, des volets basculants qui tombent quand un chiffre change, et une matrice de mots qui écrit l'heure en français ou en anglais selon la langue de Home Assistant. Les noms de jour et de mois passent par `Intl` dans la langue de Home Assistant, ils ne se limitent donc pas aux deux langues du pack.
 
-La carte ne se redessine que si son image change. Les styles LCD, Nixie, volets et mots repeignent une fois par minute ; les aiguilles battent la seconde, comme les deux-points quand `blink` est actif. Ils restent fixes par défaut : sur un écran en permanence dans le champ, un clignotement attire l'œil sans rien dire.
+La carte ne se redessine que si son image change. Les styles LCD, Nixie et mots repeignent une fois par minute, les volets deux fois, une pour basculer et une quand les volets retombent ; les aiguilles battent la seconde, comme les deux-points quand `blink` est actif. Ils restent fixes par défaut : sur un écran en permanence dans le champ, un clignotement attire l'œil sans rien dire.
 
 ### Panneau d'états
 

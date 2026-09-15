@@ -284,11 +284,13 @@ style: nixie
 | `style` | `lcd` | `lcd`, `analog`, `nixie`, `flap` or `words` |
 | `blink` | `false` | Blinking colon between hours and minutes |
 
+**[Try the five styles in your browser](https://dcybeldesign.github.io/dcy-skeuo-cards/demo/clock/)**, nothing to install.
+
 The clock follows no entity: the time comes from the browser. A timestamp sensor changes state every minute and would wake every card that tracks it, which is exactly what the render filter of the pack avoids, and on a wall screen the time that matters is the one of that screen. The `entity` option does not exist on this card.
 
 Five styles share the same card rather than five entries in the picker: an amber LCD with the date, hands with a seconds hand, Nixie tubes, split-flap modules that fall when a digit changes, and a word matrix that spells the time in French or in English, following the language of Home Assistant. Day and month names go through `Intl` in the language of Home Assistant, so they are not limited to the two languages of the pack.
 
-The card only redraws when its picture changes. The LCD, Nixie, split-flap and word styles repaint once a minute; the hands beat the second, and so does the colon when `blink` is on. The colon stays still by default: on a screen that is always in view, a blink draws the eye without saying anything.
+The card only redraws when its picture changes. The LCD, Nixie and word styles repaint once a minute, the split-flap twice, once to flip and once when the flaps land; the hands beat the second, and so does the colon when `blink` is on. The colon stays still by default: on a screen that is always in view, a blink draws the eye without saying anything.
 
 ### Status panel
 

@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skeuo Cards, clock demo</title>
+<meta name="description" content="Live demo of the Skeuo Cards clock for Home Assistant, in its five styles: amber LCD, hands, Nixie tubes, split-flap and word matrix. It runs on your own time, with no entity.">
+<style>
+  :root {
+    --bg: #141416;
+    --panel: #1c1d20;
+    --line: #2c2e33;
+    --ink: #d8d9dd;
+    --ink-dim: #8b8d94;
+    --amber: #e2a659;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 22px 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+
+  header { margin-bottom: 26px; }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: .01em;
+  }
+  h1 span { color: var(--amber); }
+  .lede { margin: 0; max-width: 62ch; color: var(--ink-dim); }
+  .lede a { color: var(--amber); }
+
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    margin: 20px 0 24px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .fld { display: flex; align-items: center; gap: 8px; }
+  .fld > label { color: var(--ink-dim); font-size: 13px; white-space: nowrap; }
+  input[type="color"] {
+    background: #26282c; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 2px; width: 38px; height: 28px; cursor: pointer;
+  }
+  input[type="range"] { width: 116px; accent-color: var(--amber); cursor: pointer; }
+  input[type="checkbox"] { accent-color: var(--amber); width: 15px; height: 15px; cursor: pointer; }
+  .val { color: var(--amber); font-variant-numeric: tabular-nums; font-size: 13px; min-width: 44px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    background: #26282c; color: var(--ink-dim); border: 0;
+    padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--amber); color: #1a1206; font-weight: 600; }
+  /* Réglage sans effet dans l'état courant : grisé plutôt que caché, pour qu'on
+     sache qu'il existe. L'infobulle dit quand il s'active. */
+  .fld.off > label, .fld.off > input { opacity: .45; }
+  .fld.off > input { cursor: not-allowed; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; }
+  .slot { display: flex; flex-direction: column; gap: 9px; }
+  /* Repère de cellule en outline et non en border : une bordure mangerait 2 px
+     sur la largeur utile et les hauteurs affichées ne tomberaient plus sur
+     celles d'un vrai dashboard. */
+  .cell { outline: 1px dashed #35373d; border-radius: 4px; }
+  /* Fond clair : seule la cellule change, la page garde ses couleurs. C'est le
+     cas le plus dur pour material: none, dont les étiquettes n'ont plus de
+     façade sombre sous elles. */
+  body.clair .cell { background: #dcdee3; outline-color: #9aa0a8; }
+  /* Les deux dispositions de Home Assistant, reproduites telles quelles.
+     Sections impose une hauteur à la cellule et étire la carte dedans, ce qui
+     neutralise l'aspect-ratio que la carte porte elle-même. Masonry ne donne
+     qu'une largeur de colonne et laisse ce ratio décider de la hauteur. */
+  .cell > * { display: block; width: 100%; }
+  .cell.sections > * { height: 100%; }
+  .cell.masonry { height: auto !important; }
+  .cell.masonry > * { height: auto; }
+  .cap { color: var(--ink-dim); font-size: 13px; display: flex; gap: 10px; align-items: baseline; margin: 0; }
+  .cap b { color: var(--ink); font-weight: 600; }
+  .cnt { color: var(--amber); font-variant-numeric: tabular-nums; }
+
+  .notes { margin-top: 34px; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .note { padding: 15px 17px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .note h2 { margin: 0 0 7px; font-size: 14px; font-weight: 650; color: var(--amber); }
+  .note p { margin: 0; color: var(--ink-dim); font-size: 14px; }
+  .note code {
+    background: #26282c; color: var(--ink);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+  }
+
+  footer { margin-top: 34px; color: var(--ink-dim); font-size: 14px; }
+  footer a { color: var(--amber); }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1><span>Skeuo Cards</span> <em data-t="title"></em></h1>
+  <p class="lede" data-t="lede"></p>
+</header>
+
+<div class="bar">
+  <div class="fld">
+    <label data-t="lang"></label>
+    <div class="seg" id="lang">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="fr" aria-pressed="false">FR</button>
+    </div>
+  </div>
+
+  <div class="fld">
+    <label data-t="layout"></label>
+    <div class="seg" id="layout">
+      <button type="button" data-layout="masonry" aria-pressed="true" data-t="masonry"></button>
+      <button type="button" data-layout="sections" aria-pressed="false" data-t="sections"></button>
+    </div>
+  </div>
+
+  <div class="fld">
+    <label data-t="material"></label>
+    <div class="seg" id="material">
+      <button type="button" data-material="carbon" aria-pressed="true" data-t="m_carbon"></button>
+      <button type="button" data-material="graphite" aria-pressed="false" data-t="m_graphite"></button>
+      <button type="button" data-material="brushed" aria-pressed="false" data-t="m_brushed"></button>
+      <button type="button" data-material="none" aria-pressed="false" data-t="m_none"></button>
+    </div>
+  </div>
+
+  <div class="fld off" id="clairFld">
+    <label for="clair" data-t="clair"></label>
+    <input id="clair" type="checkbox" disabled>
+  </div>
+
+  <div class="fld">
+    <label for="texture" data-t="grain"></label>
+    <input id="texture" type="range" min="0" max="150" step="5" value="60">
+    <span class="val" id="textureVal">60 %</span>
+  </div>
+
+  <div class="fld">
+    <label for="accent" data-t="accent"></label>
+    <input id="accent" type="color" value="#e2a659">
+  </div>
+
+  <div class="fld">
+    <label for="screws" data-t="screws"></label>
+    <input id="screws" type="checkbox" checked>
+  </div>
+
+  <div class="fld">
+    <label for="blink" data-t="blink"></label>
+    <input id="blink" type="checkbox">
+  </div>
+
+  <div class="fld">
+    <label for="w" data-t="width"></label>
+    <input id="w" type="range" min="300" max="900" step="4" value="492">
+    <span class="val" id="wVal">492</span>
+  </div>
+
+  <div class="fld" id="hFld">
+    <label for="h" data-t="height"></label>
+    <input id="h" type="range" min="2" max="7" step="1" value="4">
+    <span class="val" id="hVal">4 · 248 px</span>
+  </div>
+
+  <div class="fld" id="dFld">
+    <label data-t="derived"></label>
+    <span class="val" id="dVal">248 px</span>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="notes">
+  <div class="note">
+    <h2 data-t="n1h"></h2>
+    <p data-t="n1p"></p>
+  </div>
+  <div class="note">
+    <h2 data-t="n2h"></h2>
+    <p data-t="n2p"></p>
+  </div>
+  <div class="note">
+    <h2 data-t="n3h"></h2>
+    <p data-t="n3p"></p>
+  </div>
+</div>
+
+<footer>
+  <p data-t="foot"></p>
+</footer>
+
+</div>
+
+<script type="module">
+// Le bundle publié lui-même, comme sur la démo principale : cette page montre
+// exactement la carte que HACS installe.
+try {
+  await import("../../dist/skeuo-cards.js");
+} catch (err) {
+  document.querySelector(".lede").remove();
+  document.querySelector("h1 em").remove();
+  document.querySelector(".bar").remove();
+  document.querySelector(".notes").remove();
+  document.querySelector("footer").remove();
+  document.getElementById("grid").innerHTML = `
+    <div class="note" style="max-width:62ch">
+      <h2>The clocks could not load</h2>
+      <p>This page has to be served over HTTP. Opened straight from a
+      <code>file://</code> address it cannot work, because browsers refuse ES module
+      imports from local files. From the repository folder, run
+      <code>python -m http.server 8777</code> and open
+      <code>http://localhost:8777/demo/clock/</code>. Published on GitHub Pages it
+      needs nothing at all.</p>
+      <p style="margin-top:10px">Cette page doit être servie en HTTP. Ouverte directement depuis une
+      adresse <code>file://</code> elle ne peut pas fonctionner, les navigateurs
+      refusant les imports de module depuis un fichier local. Depuis le dossier du
+      dépôt, lancez <code>python -m http.server 8777</code> puis ouvrez
+      <code>http://localhost:8777/demo/clock/</code>.</p>
+    </div>`;
+  throw err;
+}
+
+/* --------------------------------------------------------------- textes UI */
+
+const UI = {
+  en: {
+    title: "clock demo",
+    lede: "The five styles of the clock card, running in this page. It is the same card as in the pack, unmodified, and it needs no entity: the time you see is your own. Change the material, the language or the colon, and watch the counter under each clock.",
+    lang: "Language", material: "Material", grain: "Grain", accent: "Accent",
+    screws: "Screws", width: "Cell width", height: "Grid rows",
+    clair: "Light background", clairTip: "Only with No fascia: the other materials cover the cell.",
+    m_carbon: "Carbon", m_graphite: "Graphite", m_brushed: "Brushed metal", m_none: "No fascia",
+    blink: "Blinking colon",
+    layout: "Layout", masonry: "Masonry", sections: "Sections",
+    derived: "Card height", derivedSuffix: "derived",
+    lcd: "Amber LCD screen", analog: "Hands", nixie: "Nixie tubes", flap: "Split-flap", words: "Word matrix",
+    redraws: "redraws",
+    n1h: "No entity",
+    n1p: "The time comes from the browser. A time sensor would change state every minute and wake up every card that tracks it, and on a wall screen the time that matters is the one on that screen. The word matrix and the date follow the Home Assistant language: switch to FR to see the French grid.",
+    n2h: "Rare redraws",
+    n2p: "An unrelated entity changes state twice a second in the background, and no clock reacts to it. The LCD, Nixie and word styles redraw once a minute, when the picture actually changes, and the split-flap twice, once to flip and once when the flaps land. The hands redraw every second, and so does every style once the colon blinks.",
+    n3h: "A still colon",
+    n3p: "The colon does not blink by default. On a wall screen that stays in view, a blink draws the eye without telling you anything. Tick Blinking colon to compare: the counters start climbing every second. The digital styles use the 24-hour format.",
+    foot: 'Everything on this page is drawn in CSS and SVG, 78 kB gzipped for the whole pack. The other cards are in the <a href="../">main demo</a>. Source and installation: <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+  },
+  fr: {
+    title: "démo de l'horloge",
+    lede: "Les cinq styles de la carte horloge, qui tournent dans cette page. C'est la carte du pack, sans modification, et elle n'a besoin d'aucune entité : l'heure affichée est la vôtre. Changez la matière, la langue ou le deux-points, et regardez le compteur sous chaque horloge.",
+    lang: "Langue", material: "Matière", grain: "Grain", accent: "Accent",
+    screws: "Vis", width: "Largeur cellule", height: "Lignes de grille",
+    clair: "Fond clair", clairTip: "Seulement sans façade : les autres matières couvrent la cellule.",
+    m_carbon: "Carbone", m_graphite: "Graphite", m_brushed: "Métal brossé", m_none: "Sans façade",
+    blink: "Deux-points clignotants",
+    layout: "Disposition", masonry: "Masonry", sections: "Sections",
+    derived: "Hauteur de carte", derivedSuffix: "déduite",
+    lcd: "Écran LCD ambré", analog: "Aiguilles", nixie: "Tubes Nixie", flap: "Volets basculants", words: "Matrice de mots",
+    redraws: "rendus",
+    n1h: "Aucune entité",
+    n1p: "L'heure vient du navigateur. Un capteur d'heure changerait d'état toutes les minutes et réveillerait toutes les cartes qui le suivent, et sur un écran mural l'heure qui compte est celle de cet écran. La matrice de mots et la date suivent la langue de Home Assistant : passez en FR pour voir la grille française.",
+    n2h: "Rendus rares",
+    n2p: "Une entité sans rapport change d'état deux fois par seconde en arrière-plan, et aucune horloge n'y réagit. Les styles LCD, Nixie et mots se redessinent une fois par minute, quand l'image change réellement, et les volets deux fois, une pour basculer et une quand les volets retombent. Les aiguilles se redessinent chaque seconde, et tous les styles aussi dès que le deux-points clignote.",
+    n3h: "Un deux-points fixe",
+    n3p: "Le deux-points ne clignote pas par défaut. Sur un écran mural en permanence dans le champ, un clignotement attire l'œil sans rien dire. Cochez Deux-points clignotants pour comparer : les compteurs se mettent à monter chaque seconde. Les styles numériques affichent l'heure sur 24 heures.",
+    foot: 'Tout ce que vous voyez est dessiné en CSS et SVG, 78 ko gzippés pour le pack entier. Les autres cartes sont dans la <a href="../">démo principale</a>. Source et installation : <a href="https://github.com/dcybeldesign/dcy-skeuo-cards">github.com/dcybeldesign/dcy-skeuo-cards</a>',
+  },
+};
+
+/* ----------------------------------------------------------- états simulés */
+
+// L'horloge ne suit aucune entité. La seule entité de la page est là pour
+// rendre le filtre de rendu observable : elle change deux fois par seconde et
+// aucune horloge ne doit se redessiner pour elle.
+const states = {
+  "sensor.bruit_de_fond": {
+    entity_id: "sensor.bruit_de_fond", state: "0",
+    last_changed: "", last_updated: "", context: {},
+    attributes: { friendly_name: "Background noise", unit_of_measurement: "W" },
+  },
+};
+
+let lang = "en";
+
+const hass = {
+  states,
+  themes: { darkMode: true, theme: "default" },
+  locale: { language: "en", number_format: "comma_decimal", time_format: "24" },
+  language: "en",
+  connected: true,
+  config: { state: "RUNNING", unit_system: { temperature: "°C", length: "km", mass: "kg" } },
+  localize: () => "",
+  connection: { subscribeMessage: () => Promise.resolve(async () => {}) },
+  formatEntityState: (s) => s.state,
+  callService: () => Promise.resolve(),
+};
+
+/* ------------------------------------------------------------------ montage */
+
+const STYLES = ["lcd", "analog", "nixie", "flap", "words"];
+
+const grid = document.getElementById("grid");
+const mounted = [];
+
+for (const style of STYLES) {
+  const slot = document.createElement("div");
+  slot.className = "slot";
+
+  const cell = document.createElement("div");
+  cell.className = "cell";
+
+  const el = document.createElement("skeuo-clock-card");
+  cell.appendChild(el);
+
+  const cap = document.createElement("p");
+  cap.className = "cap";
+  const nom = document.createElement("b");
+  const cnt = document.createElement("span");
+  cnt.className = "cnt";
+  cap.append(nom, cnt);
+
+  slot.append(cell, cap);
+  grid.appendChild(slot);
+
+  // Compteur de rendus : on masque la méthode du prototype par une propriété
+  // propre à l'instance, LitElement appelle this.updated() donc elle passe.
+  let rendus = 0;
+  const parent = Object.getPrototypeOf(el).updated;
+  el.updated = function (changed) {
+    rendus++;
+    cnt.textContent = `${rendus} ${UI[lang].redraws}`;
+    return parent?.call(this, changed);
+  };
+
+  mounted.push({ el, cell, style, nom, cnt, get rendus() { return rendus; } });
+}
+
+/* ---------------------------------------------------------------- réglages */
+
+const $ = (id) => document.getElementById(id);
+const reglages = { material: "carbon", texture: 60, accent: "#e2a659", screws: true, blink: false };
+
+function appliquerConfig() {
+  for (const c of mounted) {
+    c.el.setConfig({
+      type: "custom:skeuo-clock-card",
+      style: c.style,
+      subtitle: UI[lang][c.style],
+      blink: reglages.blink,
+      material: reglages.material,
+      texture: reglages.texture,
+      accent: reglages.accent,
+      screws: reglages.screws,
+    });
+  }
+}
+
+/**
+ * Hauteur réelle d'une cellule de la vue Sections : la ligne fait 56 px et
+ * l'écart entre lignes 8 px, donc n lignes occupent 64n moins 8.
+ */
+const GRID_ROW = 56, GRID_GAP = 8;
+const hauteurLignes = (n) => n * (GRID_ROW + GRID_GAP) - GRID_GAP;
+
+let disposition = "masonry";
+
+function appliquerTaille() {
+  const w = Number($("w").value);
+  const lignes = Number($("h").value);
+  const h = hauteurLignes(lignes);
+  const enSections = disposition === "sections";
+
+  $("wVal").textContent = w;
+  $("hVal").textContent = `${lignes} · ${h} px`;
+  $("hFld").classList.toggle("hidden", !enSections);
+  $("dFld").classList.toggle("hidden", enSections);
+
+  for (const c of mounted) {
+    c.cell.classList.toggle("sections", enSections);
+    c.cell.classList.toggle("masonry", !enSections);
+    c.cell.style.width = `${w}px`;
+    c.cell.style.height = enSections ? `${h}px` : "";
+  }
+
+  if (!enSections) {
+    const px = mounted[0].el.offsetHeight;
+    $("dVal").textContent = `${px} px · ${UI[lang].derivedSuffix}`;
+  }
+}
+
+function appliquerTextes() {
+  const d = UI[lang];
+  for (const n of document.querySelectorAll("[data-t]")) {
+    n.innerHTML = d[n.dataset.t] ?? "";
+  }
+  for (const b of document.querySelectorAll("#lang button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
+  }
+  for (const c of mounted) {
+    c.nom.textContent = d[c.style];
+    c.cnt.textContent = `${c.rendus} ${d.redraws}`;
+  }
+  document.documentElement.lang = lang;
+  appliquerMateriau();
+}
+
+/**
+ * Boutons de matière et case du fond clair, comme sur la démo principale : le
+ * fond clair n'a de sens que sans façade, il reste grisé sinon et se décoche
+ * quand on revient à une matière.
+ */
+function appliquerMateriau() {
+  for (const b of document.querySelectorAll("#material button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.material === reglages.material));
+  }
+  const sansFacade = reglages.material === "none";
+  $("clair").disabled = !sansFacade;
+  if (!sansFacade && $("clair").checked) {
+    $("clair").checked = false;
+    document.body.classList.remove("clair");
+  }
+  $("clairFld").classList.toggle("off", !sansFacade);
+  $("clairFld").title = sansFacade ? "" : UI[lang].clairTip;
+}
+
+// Le filtre de rendu compare les références de themes, locale et config : un
+// objet locale neuf à chaque envoi ferait repasser les cartes pour rien.
+let locale = { ...hass.locale };
+
+function push() {
+  const suivant = { ...hass, language: lang, locale, states: { ...states } };
+  for (const c of mounted) c.el.hass = suivant;
+}
+
+$("material").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.material === reglages.material) return;
+  reglages.material = b.dataset.material;
+  appliquerMateriau();
+  appliquerConfig();
+});
+$("texture").addEventListener("input", (e) => {
+  reglages.texture = Number(e.target.value);
+  $("textureVal").textContent = `${e.target.value} %`;
+  appliquerConfig();
+});
+$("accent").addEventListener("input", (e) => { reglages.accent = e.target.value; appliquerConfig(); });
+$("screws").addEventListener("change", (e) => { reglages.screws = e.target.checked; appliquerConfig(); });
+$("blink").addEventListener("change", (e) => { reglages.blink = e.target.checked; appliquerConfig(); });
+$("clair").addEventListener("change", (e) => { document.body.classList.toggle("clair", e.target.checked); });
+
+$("w").addEventListener("input", appliquerTaille);
+$("h").addEventListener("input", appliquerTaille);
+
+$("layout").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.layout === disposition) return;
+  disposition = b.dataset.layout;
+  for (const x of document.querySelectorAll("#layout button")) {
+    x.setAttribute("aria-pressed", String(x.dataset.layout === disposition));
+  }
+  appliquerTaille();
+});
+
+$("lang").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.dataset.lang === lang) return;
+  lang = b.dataset.lang;
+  // Changement réel de langue : le frontend remplace l'objet locale, et les
+  // horloges repassent pour changer de grille de mots et de date.
+  locale = { ...hass.locale, language: lang };
+  appliquerTextes();
+  appliquerConfig();
+  appliquerTaille();
+  push();
+});
+
+/* -------------------------------------------------------------- démarrage */
+
+appliquerTextes();
+appliquerConfig();
+appliquerTaille();
+push();
+
+// Entité sans rapport : deux changements par seconde. Les horloges ne doivent
+// pas se redessiner pour elle, seulement quand leur propre image change.
+setInterval(() => {
+  states["sensor.bruit_de_fond"] = {
+    ...states["sensor.bruit_de_fond"],
+    state: String(Math.round(Math.random() * 2000)),
+  };
+  push();
+}, 500);
+</script>
+</body>
+</html>

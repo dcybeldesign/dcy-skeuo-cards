@@ -7,10 +7,11 @@
   panel shows a list of two-state entities, doors, windows, motion, lights,
   locks, people, as a backlit annunciator, indicator lamps or split-flap
   modules.
-- The clock only redraws when its picture changes. The LCD, Nixie, split-flap
-  and word styles repaint once a minute; only the hands, and the colon when
-  `blink` is on, beat the second. The colon is still by default: on a wall
-  screen that stays in view, a blink draws the eye without saying anything.
+- The clock only redraws when its picture changes. The LCD, Nixie and word
+  styles repaint once a minute, the split-flap twice, once to flip and once
+  when the flaps land; only the hands, and the colon when `blink` is on, beat
+  the second. The colon is still by default: on a wall screen that stays in
+  view, a blink draws the eye without saying anything.
 - The status panel takes its tint from the `device_class`. Red is kept for a
   short list of real alarms, smoke, gas, carbon monoxide, safety, tamper,
   problem, moisture and heat; everything else takes the amber of the pack, so
